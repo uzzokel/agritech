@@ -2,16 +2,23 @@
 @import "tailwindcss";
 
 @theme {
-  /* 60% Dominant: Deep Navy Slate */
-  --color-brand-primary: #0f172a;          /* slate-900 */
-  --color-brand-primary-dark: #020617;     /* slate-950 */
+  /* 60% Dominant: Deep Navy Slate (theme.primaryColor) */
+  --color-brand-primary: #0f172a;          
+  --color-brand-primary-dark: #020617;     
   
   /* 30% Structural Base: Clean Whites & Light Grays */
-  --color-canvas-bg: #f8fafc;              /* slate-50 */
-  --color-canvas-card: #ffffff;            /* pure white */
-  --color-canvas-border: #e2e8f0;          /* slate-200 */
+  --color-canvas-bg: #f8fafc;              
+  --color-canvas-card: #ffffff;            
+  --color-canvas-border: #e2e8f0;          
   
-  /* 10% Accent Focus: Emergence Green */
-  --color-brand-accent: #16a34a;           /* green-600 */
-  --color-brand-accent-light: #dcfce7;     /* green-100 */
+  /* 10% Accent Focus: Vitality Green (theme.secondaryColor) */
+  --color-brand-accent: #16a34a;           
+  --color-brand-accent-light: #dcfce7;     
+}
+
+/* Explicitly bind the root container colors */
+html, body {
+  background-color: var(--color-canvas-bg);
+  color: var(--color-brand-primary);
+  color-scheme: light;
 }
