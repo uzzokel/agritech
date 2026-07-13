@@ -1,26 +1,17 @@
+/* app/globals.css */
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme {
+  /* 60% Dominant: Deep Navy Slate */
+  --color-brand-primary: #0f172a;          /* slate-900 */
+  --color-brand-primary-dark: #020617;     /* slate-950 */
+  
+  /* 30% Structural Base: Clean Whites & Light Grays */
+  --color-canvas-bg: #f8fafc;              /* slate-50 */
+  --color-canvas-card: #ffffff;            /* pure white */
+  --color-canvas-border: #e2e8f0;          /* slate-200 */
+  
+  /* 10% Accent Focus: Emergence Green */
+  --color-brand-accent: #16a34a;           /* green-600 */
+  --color-brand-accent-light: #dcfce7;     /* green-100 */
 }
