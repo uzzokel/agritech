@@ -6,27 +6,27 @@ import { theme } from "../Styles";
 
 export default function Logo() {
   const handleClick = () => {
-    // Smoothly scroll the screen back to the top navbar header if scrolled down
-    const navbarElement = document.getElementById("global-site-navbar");
-    if (navbarElement) {
-      navbarElement.scrollIntoView({ behavior: "smooth" });
-    }
+    // Smoothly scroll the entire window back to the top
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
   };
   
   return (
     <div className="flex flex-col leading-tight z-50">
       <Link 
-        href="#global-site-navbar" 
+        href="#" 
         onClick={handleClick} 
         className="flex items-center gap-2 font-semibold"
       >
         <Image 
-          src="/agricultural-gear-logo.jpg" // 👈 FIXED: Removed /public prefix for Next.js routing
+          src="/agricultural-gear-logo.jpg" 
           alt="logo"
           width={80} 
           height={80}
           priority 
-          className="w-15 h-15 object-contain"
+          className="w-15 h-15 object-cover rounded-full"
         />
         
         <span 

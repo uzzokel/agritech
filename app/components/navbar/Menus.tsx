@@ -9,7 +9,6 @@ interface MenusProps {
 }
 
 export default function Menus({ isScrolled }: MenusProps) {
-  // 🟢 Fixed: Swapped Neon DB out for Prisma/Supabase tracking context
   const menuItems = [
     { label: "Home", path: "/" },
     { label: "Features", path: "/features" },
@@ -18,7 +17,6 @@ export default function Menus({ isScrolled }: MenusProps) {
     { label: "Projects", path: "/projects" },
   ];
 
-  // Specific dropdown files under the Dashboard umbrella
   const dashboardDropdownItems = [
     { label: "Overview", path: "/dashboard" },
     { label: "Predict Impact", path: "/dashboard/predict-impact" },
@@ -83,9 +81,14 @@ export default function Menus({ isScrolled }: MenusProps) {
           </span>
         </button>
 
-        {/* Dropdown Menu Container Panel */}
+        {/* Glossy & Translucent Dropdown Menu Container Panel */}
         {isDropdownOpen && (
-          <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white border border-gray-100 py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div 
+            className="absolute left-0 mt-2 w-48 rounded-lg border border-white/20 p-1 z-50 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200"
+            style={{ 
+              backgroundColor: `${theme.primaryColor}cc` // Adds 'cc' hex transparency (80% opacity) for that light, glass look
+            }}
+          >
             {dashboardDropdownItems.map((subItem, index) => (
               <Link
                 key={index}
@@ -94,10 +97,13 @@ export default function Menus({ isScrolled }: MenusProps) {
                   setActiveMenuItem("Dashboard");
                   setIsDropdownOpen(false);
                 }}
-                className="block px-4 py-2.5 text-sm transition-colors hover:bg-slate-50"
-                style={{ color: theme.primaryColor }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = theme.secondaryColor)}
-                onMouseLeave={(e) => (e.currentTarget.style.color = theme.primaryColor)}
+                className="block px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 text-white/90 hover:bg-white/10"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = theme.secondaryColor;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.9)";
+                }}
               >
                 {subItem.label}
               </Link>
