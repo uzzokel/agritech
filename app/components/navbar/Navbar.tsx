@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Logo from "./Logo";
 import Menus from "./Menus";
 import Social from "./Social";
-import SignIn from "./SignIn";
+import LoginButton from "./SignIn";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
@@ -46,7 +46,7 @@ export default function Navbar() {
             <div className="flex items-center gap-4 z-50">
               <Social isScrolled={isScrolled} />
               {/* We will add the Clerk login button here later! */}
-              <SignIn isScrolled={isScrolled} />
+             <LoginButton />
             </div>
           </div>
         </div>
