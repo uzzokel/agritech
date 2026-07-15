@@ -14,6 +14,7 @@ export default function Menus({ isScrolled }: MenusProps) {
     { label: "Features", path: "/features" },
     { label: "About", path: "/about" },
     { label: "Services", path: "/services" },
+    { label: "Blog", path: "/blog" }, // Added Blog!
     { label: "Projects", path: "/projects" },
   ];
 

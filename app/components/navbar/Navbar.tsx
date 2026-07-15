@@ -5,20 +5,30 @@ import Logo from "./Logo";
 import Menus from "./Menus";
 import Social from "./Social";
 import LoginButton from "./SignIn";
+import MobileMenu from "./MobileMenu"; 
+import { HiMenu, HiX } from "react-icons/hi"; 
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
+  const [menuOpen, setMenuOpen] = useState<boolean>(false); 
 
-  // Listen to the window scroll event
+  // Lock scrolling when the mobile menu is open
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [menuOpen]);
+
   useEffect(() => {
     const handleScroll = () => {
-      // Sets true if scrolled down more than 20 pixels, false otherwise
       setIsScrolled(window.scrollY > 20);
     };
-
     window.addEventListener("scroll", handleScroll);
-    
-    // Clean up the event listener when the navbar unmounts
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -26,31 +36,48 @@ export default function Navbar() {
     <header
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
         isScrolled 
-          ? "bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100 py-3" 
-          : "bg-transparent py-5"
+          ? "bg-white shadow-sm border-b border-gray-100 py-3" 
+          : "bg-transparent py-5" 
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex w-full items-center justify-between h-16">
           {/* Left Side: Logo */}
           <div className="flex-shrink-0">
             <Logo />
           </div>
 
-          {/* Right Side: Navigation Menus and Social Links aligned together */}
-          <div className="flex items-center gap-16">
-            <nav>
+          {/* Right Side: Navigation controls */}
+          <div className="flex items-center gap-4 lg:gap-16">
+            <nav className="hidden lg:block">
               <Menus isScrolled={isScrolled} />
             </nav>
             
-            <div className="flex items-center gap-4 z-50">
-              <Social isScrolled={isScrolled} />
-              {/* We will add the Clerk login button here later! */}
-             <LoginButton />
+            <div className="flex items-center gap-2 sm:gap-4 z-50">
+              <div className="hidden lg:block">
+                <Social isScrolled={isScrolled} />
+              </div>
+              
+              {/* FIXED: Always visible, compact Sign In Button */}
+              <LoginButton />
+
+              {/* Mobile Hamburger Toggle Button */}
+              <button 
+                className={`lg:hidden text-3xl focus:outline-none transition-all duration-300 hover:scale-110 cursor-pointer ${
+                  isScrolled ? "text-slate-800" : "text-slate-800 lg:text-white"
+                }`}
+                onClick={() => setMenuOpen(!menuOpen)} 
+                aria-label="Toggle menu"
+              >
+                {menuOpen ? <HiX /> : <HiMenu />}
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Rendering our sliding Mobile Menu */}
+      <MobileMenu menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
     </header>
   );
 }
