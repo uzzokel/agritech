@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import Logo from "./Logo";
 import Menus from "./Menus";
 import Social from "./Social";
-import LoginButton from "./SignIn";
+import LoginButton from "./SignIn"; // Your custom sign-in button
 import MobileMenu from "./MobileMenu"; 
 import { HiMenu, HiX } from "react-icons/hi"; 
+import { SignInButton, UserButton, Show } from '@clerk/nextjs';
+
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
@@ -58,8 +60,24 @@ export default function Navbar() {
                 <Social isScrolled={isScrolled} />
               </div>
               
-              {/* FIXED: Always visible, compact Sign In Button */}
-              <LoginButton />
+              {/* Clerk Dynamic Authentication Interface */}
+              <div className="flex items-center">
+                {/* 1. Show your custom LoginButton when signed out */}
+                <Show when="signed-out">
+                  <LoginButton />
+                </Show>
+
+                {/* 2. Show Clerk's secure user profile menu when signed in */}
+                <Show when="signed-in">
+                  <UserButton 
+                    appearance={{
+                      elements: {
+                        userButtonAvatarBox: "w-9 h-9 border border-emerald-500/20 hover:scale-105 transition duration-200",
+                      }
+                    }}
+                  />
+                </Show>
+              </div>
 
               {/* Mobile Hamburger Toggle Button */}
               <button 
