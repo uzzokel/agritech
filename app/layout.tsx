@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import Navbar from "./components/navbar/Navbar"; // Adjust path if your folder structure differs slightly
 import "./globals.css";
+import Footer from "./components/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col">
           <Navbar />
           {children}
+          <Footer/>
         </body>
       </html>
     </ClerkProvider>

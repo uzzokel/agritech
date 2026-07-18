@@ -4,15 +4,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { theme } from "../Styles";
 
-export default function Logo() {
+// Added the prop interface to read the scroll state
+interface LogoProps {
+  isScrolled: boolean;
+}
+
+export default function Logo({ isScrolled }: LogoProps) {
   const handleClick = () => {
-    // Smoothly scroll the entire window back to the top
     window.scrollTo({
       top: 0,
       behavior: "smooth"
     });
   };
   
+  // FIX: Swaps the "Tech" text color between white (unscrolled) and your primary color (scrolled)
+  const techTextColor = isScrolled ? theme.primaryColor : "#ffffff";
+
   return (
     <div className="flex flex-col leading-tight z-50">
       <Link 
@@ -30,8 +37,8 @@ export default function Logo() {
         />
         
         <span 
-          style={{ color: theme.primaryColor }} 
-          className="text-2xl italic font-bold"
+          style={{ color: techTextColor }} 
+          className="text-2xl italic font-bold transition-colors duration-300"
         >
           <span style={{ color: theme.secondaryColor }}>Agri</span>Tech
         </span>

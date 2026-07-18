@@ -14,7 +14,7 @@ export default function Menus({ isScrolled }: MenusProps) {
     { label: "Features", path: "/features" },
     { label: "About", path: "/about" },
     { label: "Services", path: "/services" },
-    { label: "Blog", path: "/blog" }, // Added Blog!
+    { label: "Blog", path: "/blog" },
     { label: "Projects", path: "/projects" },
   ];
 
@@ -38,11 +38,12 @@ export default function Menus({ isScrolled }: MenusProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // FIX: When NOT scrolled, menus render as high-contrast white to stand out cleanly against the navy hero background
   const getRestingStyle = () => {
     if (isScrolled) {
       return { color: theme.primaryColor, opacity: 1 };
     }
-    return { color: theme.primaryColor, opacity: 0.65 };
+    return { color: "#ffffff", opacity: 0.75 };
   };
 
   return (
