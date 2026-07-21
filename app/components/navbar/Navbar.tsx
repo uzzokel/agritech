@@ -1,18 +1,28 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link"; // 👈 1. Added Link import
 import Logo from "./Logo";
 import Menus from "./Menus";
 import Social from "./Social";
-import LoginButton from "./SignIn"; // Your custom sign-in button
+import LoginButton from "./SignIn";
 import MobileMenu from "./MobileMenu"; 
 import { HiMenu, HiX } from "react-icons/hi"; 
-import { SignInButton, UserButton, Show } from '@clerk/nextjs';
+import { SignInButton, UserButton, Show, useUser } from "@clerk/nextjs"; // 👈 2. Added useUser import
 
+// ⚠️ Put your actual Clerk email address here!
+const ADMIN_EMAILS = [
+    "uzzokel@gmail.com", // <-- Replace with your email
+];
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [menuOpen, setMenuOpen] = useState<boolean>(false); 
+
+  // 👈 3. Get the logged-in user & check if their email matches ADMIN_EMAILS
+  const { user } = useUser();
+  const primaryEmail = user?.primaryEmailAddress?.emailAddress;
+  const isAdmin = primaryEmail ? ADMIN_EMAILS.includes(primaryEmail) : false;
 
   // Lock scrolling when the mobile menu is open
   useEffect(() => {
@@ -69,13 +79,25 @@ export default function Navbar() {
 
                 {/* 2. Show Clerk's secure user profile menu when signed in */}
                 <Show when="signed-in">
-                  <UserButton 
-                    appearance={{
-                      elements: {
-                        userButtonAvatarBox: "w-9 h-9 border border-emerald-500/20 hover:scale-105 transition duration-200",
-                      }
-                    }}
-                  />
+                  <div className="flex items-center gap-3">
+                    {/* 🔒 4. Admin Button (Renders ONLY if logged in as an Admin) */}
+                    {isAdmin && (
+                      <Link
+                        href="/admin"
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                      >
+                        Admin
+                      </Link>
+                    )}
+
+                    <UserButton 
+                      appearance={{
+                        elements: {
+                          userButtonAvatarBox: "w-9 h-9 border border-emerald-500/20 hover:scale-105 transition duration-200",
+                        }
+                      }}
+                    />
+                  </div>
                 </Show>
               </div>
 

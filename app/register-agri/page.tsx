@@ -20,6 +20,7 @@ export default function RegisterAgriPage() {
 
   const [form, setForm] = useState({
     fullName: "",
+    email: "", // 👈 1. Added email state
     state: "",
     lga: "",
     designation: "",
@@ -37,6 +38,12 @@ export default function RegisterAgriPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    if (!form.email) {
+      setError("Please enter a valid email address.");
+      setLoading(false);
+      return;
+    }
 
     if (!form.designation) {
       setError("Please select a designation from the dropdown.");
@@ -108,6 +115,23 @@ export default function RegisterAgriPage() {
               placeholder="e.g. Ibrahim Musa"
               className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
             />
+          </div>
+
+          {/* 👈 2. Added Email Address Input */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-300 mb-1">Email Address *</label>
+            <input
+              type="email"
+              name="email"
+              required
+              value={form.email}
+              onChange={handleChange}
+              placeholder="e.g. ibrahim@example.com"
+              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Your AGRI-ID approval notification and login details will be sent here.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
