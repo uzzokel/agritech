@@ -2,27 +2,43 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { Status } from "@prisma/client";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-function isValidPasscode(passcode?: string) {
-  const secret = process.env.ADMIN_SECRET_PASSCODE;
-  // If no secret passcode is defined in .env.local, fall back to standard Clerk auth check
-  if (!secret) return true;
-  return passcode === secret;
-}
+// Define your admin email (falls back to uzzokel@gmail.com)
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "uzzokel@gmail.com";
 
-export async function getPendingUsers(passcode?: string) {
+// Security helper: Verifies the user is logged in via Clerk with the admin email
+async function isAdminAuthorized() {
   const { userId } = await auth();
-  if (!userId || !isValidPasscode(passcode)) {
-    return { success: false, error: "Unauthorized access or invalid passcode.", users: [] };
+  if (!userId) return false;
+
+  const user = await currentUser();
+  const primaryEmail = user?.emailAddresses[0]?.emailAddress;
+
+  if (primaryEmail !== ADMIN_EMAIL) {
+    console.warn(`⚠️ Unauthorized admin access attempt by: ${primaryEmail}`);
+    return false;
   }
 
+  return true;
+}
+
+export async function getPendingUsers() {
   try {
+    const isAuth = await isAdminAuthorized();
+    if (!isAuth) {
+      return {
+        success: false,
+        error: "Unauthorized access: Admin privileges required.",
+        users: [],
+      };
+    }
+
     const pendingUsers = await prisma.user.findMany({
       where: { status: Status.PENDING },
       orderBy: { createdAt: "desc" },
@@ -47,24 +63,17 @@ export async function getPendingUsers(passcode?: string) {
   }
 }
 
-export async function updateUserStatus(
-  userId: string,
-  status: Status,
-  passcode?: string
-) {
-  const { userId: adminClerkId } = await auth();
-  if (!adminClerkId || !isValidPasscode(passcode)) {
-    return { success: false, error: "Unauthorized access or invalid passcode." };
-  }
-
+export async function updateUserStatus(userId: string, status: Status) {
   try {
-    // 1. Update status, mark emailSent, and fetch user details
+    const isAuth = await isAdminAuthorized();
+    if (!isAuth) {
+      return { success: false, error: "Unauthorized access: Admin privileges required." };
+    }
+
+    // 1. Update status and fetch applicant details
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: {
-        status,
-        emailSent: status === Status.APPROVED ? true : undefined,
-      },
+      data: { status },
       select: {
         email: true,
         fullName: true,
@@ -74,9 +83,9 @@ export async function updateUserStatus(
 
     // 2. Send email notification if approved
     if (status === Status.APPROVED) {
-      await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: "AgriTech Onboarding <onboarding@resend.dev>",
-        to: updatedUser.email,
+        to: [updatedUser.email],
         subject: "🎉 Application Approved - Your AGRI-ID Access Details",
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 12px;">
@@ -85,7 +94,7 @@ export async function updateUserStatus(
             <p style="color: #cbd5e1; line-height: 1.5;">
               Your registration request has been reviewed and officially approved by the admin team.
             </p>
-            
+
             <div style="background-color: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #334155; text-align: center;">
               <p style="margin: 0 0 6px 0; font-size: 11px; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px;">Your Official AGRI-ID</p>
               <p style="margin: 0; font-family: monospace; font-size: 26px; font-weight: bold; color: #34d399;">
@@ -99,6 +108,13 @@ export async function updateUserStatus(
           </div>
         `,
       });
+
+      if (error) {
+        console.error("❌ RESEND API ERROR:", error);
+        return { success: false, error: error.message };
+      }
+
+      console.log("✅ RESEND SUCCESS! Email ID:", data?.id);
     }
 
     revalidatePath("/admin");

@@ -10,51 +10,49 @@ function generateUniqueAgriId(): string {
 
 export async function registerAgriUser(formData: {
   fullName: string;
-  email: string; // 👈 1. Added email to TypeScript type
+  email: string;
   state: string;
   lga: string;
   designation: string;
   phoneNumber?: string;
   securityPin: string;
 }) {
-  // Check if user is signed in with Clerk (optional for new applicants)
   const { userId } = await auth();
   const user = await currentUser();
 
-  // 👈 2. Use email from the form input, falling back to Clerk email if present
   const targetEmail = formData.email || user?.emailAddresses[0]?.emailAddress;
 
   if (!targetEmail) {
     return { success: false, error: "A valid email address is required." };
   }
 
-  // 👈 3. Check if an application already exists for this email or Clerk ID
+  // 👈 1. Only check if THIS specific email address already exists
   const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        ...(userId ? [{ clerkUserId: userId }] : []),
-        { email: targetEmail },
-      ],
-    },
+    where: { email: targetEmail },
   });
 
   if (existingUser) {
     return {
       success: false,
-      error: `An application with this email already exists. Current status: ${existingUser.status}`,
+      error: `An application with email (${targetEmail}) already exists. Current status: ${existingUser.status}`,
     };
   }
 
   try {
     const uniqueAdminId = generateUniqueAgriId();
 
+    // 👈 2. Generate a unique ID key so Clerk logins don't clash during testing
+    const uniqueClerkId = userId 
+      ? `${userId}_${Date.now()}` 
+      : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
     await prisma.user.create({
       data: {
-        clerkUserId: userId || `guest_${Date.now()}`, // Ties to Clerk if logged in, or uses guest placeholder
+        clerkUserId: uniqueClerkId,
         uniqueAdminId: uniqueAdminId,
         securityPin: formData.securityPin,
         fullName: formData.fullName,
-        email: targetEmail, // 👈 4. Saves the submitted form email to database
+        email: targetEmail,
         state: formData.state,
         lga: formData.lga,
         designation: formData.designation,

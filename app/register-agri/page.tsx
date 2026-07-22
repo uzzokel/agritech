@@ -130,7 +130,7 @@ export default function RegisterAgriPage() {
               className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
             />
             <p className="text-[11px] text-gray-500 mt-1">
-              Your AGRI-ID approval notification and login details will be sent here.
+              Your AGRI-ID approval notification and login details will be sent to your registered Email.
             </p>
           </div>
 
