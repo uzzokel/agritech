@@ -3,7 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  
 }
 
 enum Role {
@@ -33,4 +34,28 @@ model User {
   emailSent     Boolean  @default(false)   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// ==========================================
+// NEW: Farmer Registration Model for Overview
+// ==========================================
+model Farmer {
+  id                     String   @id @default(uuid())
+  fullName               String
+  age                    Int
+  gender                 String
+  highestEducation       String
+  maritalStatus          String
+  householdSize          Int?
+  state                  String
+  lga                    String
+  cluster                String
+  userGroup              String
+  nameOfChosenEnterprise String
+  typeOfEnterprise       String
+  estimatedAnnualIncome  Float
+  phoneNumber            String
+  photoUrl               String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }

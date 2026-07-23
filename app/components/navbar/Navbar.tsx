@@ -1,30 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link"; // 👈 1. Added Link import
+import Link from "next/link";
 import Logo from "./Logo";
 import Menus from "./Menus";
 import Social from "./Social";
 import LoginButton from "./SignIn";
 import MobileMenu from "./MobileMenu"; 
 import { HiMenu, HiX } from "react-icons/hi"; 
-import { SignInButton, UserButton, Show, useUser } from "@clerk/nextjs"; // 👈 2. Added useUser import
+import { SignInButton, UserButton, Show, useUser } from "@clerk/nextjs";
 
-// ⚠️ Put your actual Clerk email address here!
 const ADMIN_EMAILS = [
-    "uzzokel@gmail.com", // <-- Replace with your email
+  "uzzokel@gmail.com",
 ];
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [menuOpen, setMenuOpen] = useState<boolean>(false); 
 
-  // 👈 3. Get the logged-in user & check if their email matches ADMIN_EMAILS
   const { user } = useUser();
   const primaryEmail = user?.primaryEmailAddress?.emailAddress;
   const isAdmin = primaryEmail ? ADMIN_EMAILS.includes(primaryEmail) : false;
 
-  // Lock scrolling when the mobile menu is open
   useEffect(() => {
     if (menuOpen) {
       document.body.style.overflow = "hidden";
@@ -72,15 +69,12 @@ export default function Navbar() {
               
               {/* Clerk Dynamic Authentication Interface */}
               <div className="flex items-center">
-                {/* 1. Show your custom LoginButton when signed out */}
                 <Show when="signed-out">
                   <LoginButton />
                 </Show>
 
-                {/* 2. Show Clerk's secure user profile menu when signed in */}
                 <Show when="signed-in">
                   <div className="flex items-center gap-3">
-                    {/* 🔒 4. Admin Button (Renders ONLY if logged in as an Admin) */}
                     {isAdmin && (
                       <Link
                         href="/admin"
@@ -102,9 +96,10 @@ export default function Navbar() {
               </div>
 
               {/* Mobile Hamburger Toggle Button */}
+              {/* FIX: Set text-white when NOT scrolled so it is visible over your primary hero color */}
               <button 
                 className={`lg:hidden text-3xl focus:outline-none transition-all duration-300 hover:scale-110 cursor-pointer ${
-                  isScrolled ? "text-slate-800" : "text-slate-800 lg:text-white"
+                  isScrolled ? "text-slate-800" : "text-white"
                 }`}
                 onClick={() => setMenuOpen(!menuOpen)} 
                 aria-label="Toggle menu"

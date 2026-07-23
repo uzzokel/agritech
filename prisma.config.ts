@@ -1,12 +1,12 @@
+// prisma.config.ts
 import "dotenv/config";
-import { defineConfig } from "prisma/config";
+import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
-  migrations: {
-    path: "prisma/migrations",
-  },
   datasource: {
-    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
+    // Note: Use your DIRECT_URL here if using pooled connections (e.g., Supabase, Neon) 
+    // for CLI migrations and push commands.
+    url: env("DIRECT_URL") ?? env("DATABASE_URL"),
   },
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { getPendingUsers, updateUserStatus } from "@/app/actions/admin-actions";
 
 interface UserRecord {
@@ -16,13 +16,12 @@ interface UserRecord {
   createdAt: Date;
 }
 
-type StatusType = "APPROVED" | "REJECTED";
+type StatusType = "APPROVED" | "DENIED";
 
 export default function AdminDashboardPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isPending, startTransition] = useTransition();
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
 
   const loadUsers = async () => {
@@ -41,9 +40,10 @@ export default function AdminDashboardPage() {
     loadUsers();
   }, []);
 
-  const handleStatusChange = (userId: string, newStatus: StatusType) => {
+  // PASTE IS HERE 👇
+  const handleStatusChange = async (userId: string, newStatus: StatusType) => {
     setActiveUserId(userId);
-    startTransition(async () => {
+    try {
       const res = await updateUserStatus(userId, newStatus);
       if (res.success) {
         // Optimistically remove the user from the list once updated
@@ -51,8 +51,12 @@ export default function AdminDashboardPage() {
       } else {
         alert(res.error || "Failed to update status.");
       }
+    } catch (err) {
+      console.error("Error updating status:", err);
+      alert("An unexpected error occurred while updating status.");
+    } finally {
       setActiveUserId(null);
-    });
+    }
   };
 
   return (
@@ -114,7 +118,7 @@ export default function AdminDashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {users.map((user) => {
-                    const isProcessingThisUser = isPending && activeUserId === user.id;
+                    const isProcessingThisUser = activeUserId === user.id;
 
                     return (
                       <tr key={user.id} className="hover:bg-slate-800/40 transition">
@@ -159,7 +163,7 @@ export default function AdminDashboardPage() {
                             </button>
                             <button
                               disabled={isProcessingThisUser}
-                              onClick={() => handleStatusChange(user.id, "REJECTED")}
+                              onClick={() => handleStatusChange(user.id, "DENIED")}
                               className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-600 border border-rose-500/30 hover:border-transparent text-rose-300 hover:text-white disabled:opacity-50 text-xs font-semibold rounded-lg transition"
                             >
                               {isProcessingThisUser ? "Rejecting..." : "Reject"}

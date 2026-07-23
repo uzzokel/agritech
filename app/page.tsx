@@ -5,7 +5,7 @@ import { theme } from "@/app/components/Styles";
 import Link from "next/link";
 import { SignInButton, SignUpButton, UserButton, Show } from '@clerk/nextjs';
 import RollingTicker from './components/RollingTicker';
-import LiveTimer from './components/LiveTimer'; // 1. Imported the countdown timer here
+import LiveTimer from './components/LiveTimer';
 
 export default function Page() {
   const { primaryColor, secondaryColor } = theme;
@@ -16,10 +16,10 @@ export default function Page() {
     <main className="w-full selection:bg-green-600/30" style={{ backgroundColor: primaryColor }}>
       
       {/* 
-        FIX: Increased top padding to pt-36 on small screens and pt-44 on larger screens. 
-        This completely brings the entire hero container down past your navigation layer.
+        UPDATED: Set top padding to pt-20 / md:pt-24 (standard header clearance) 
+        and min-h-screen to pull the section up behind a sticky/fixed transparent navbar.
       */}
-      <section className="relative w-full flex items-center justify-center pt-36 pb-24 md:pt-44 md:pb-32 overflow-hidden isolate">
+      <section className="relative w-full min-h-screen flex items-center justify-center pt-20 pb-16 md:pt-24 md:pb-24 overflow-hidden isolate">
         
         {/* Subtle background glow from your growth green color */}
         <div 
@@ -33,20 +33,19 @@ export default function Page() {
             {/* Left Column: Typography & Action Buttons */}
             <div className="flex flex-col justify-center text-left">
 
-              {/* 2. Live Countdown Timer placed directly above the ticker */}
+              {/* Live Countdown Timer */}
               <div className="mb-2 pl-1">
                 <LiveTimer />
               </div>
 
-              {/* 3. The Ticker fits right here, contained to the left column */}
-              {/* Added mb-8 to push the content below down, and rounded-xl to shape it cleanly */}
+              {/* The Ticker */}
               <div className="w-full mb-8 overflow-hidden rounded-xl">
                 <RollingTicker />
               </div>
 
               {/* 30% Secondary Accent */}
               <span className="font-bold uppercase tracking-wider text-sm mb-3 block" style={{ color: secondaryColor }}>
-                Welcome to the AgriTech
+                Welcome to AgriTech
               </span>
               
               {/* 10% High-Contrast White */}
@@ -55,7 +54,6 @@ export default function Page() {
                 <span style={{ color: secondaryColor }}>Harvesting Ideas.</span>
               </h1>
               
-              {/* ... The rest of your code remains unchanged ... */}
               <h2 className="text-lg sm:text-xl text-slate-300 font-medium leading-relaxed max-w-xl">
                 <span className="font-semibold" style={{ color: secondaryColor }}>Connect, cultivate, and trade:</span>{" "}
                 your ultimate hub for sharing farming insights and premier agricultural products.
