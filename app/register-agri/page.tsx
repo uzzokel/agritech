@@ -90,7 +90,7 @@ export default function RegisterAgriPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-white py-12">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-white py-12 pt-30">
       <div className="max-w-lg w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl">
         <h1 className="text-2xl font-bold mb-1 text-emerald-400">AgriTech Access Application</h1>
         <p className="text-sm text-gray-400 mb-6">
@@ -182,7 +182,7 @@ export default function RegisterAgriPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1">Phone Number (Optional)</label>
+            <label className="block text-xs font-semibold text-gray-300 mb-1">Phone Number (required)</label>
             <input
               type="tel"
               name="phoneNumber"

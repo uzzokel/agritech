@@ -1,4 +1,3 @@
-// app/actions/admin-actions.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -9,10 +8,9 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Define your admin email (falls back to uzzokel@gmail.com)
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "uzzokel@gmail.com";
 
-// Security helper: Verifies the user is logged in via Clerk with the admin email
+// Security helper: Verifies user is logged in via Clerk as admin
 async function isAdminAuthorized() {
   const { userId } = await auth();
   if (!userId) return false;
@@ -26,6 +24,27 @@ async function isAdminAuthorized() {
   }
 
   return true;
+}
+
+// Collision-proof unique AGRI ID generator
+async function generateUniqueAgriId(): Promise<string> {
+  let uniqueId = "";
+  let exists = true;
+
+  while (exists) {
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    uniqueId = `AGRI-${randomNum}`;
+
+    const count = await prisma.user.count({
+      where: { uniqueAdminId: uniqueId },
+    });
+
+    if (count === 0) {
+      exists = false;
+    }
+  }
+
+  return uniqueId;
 }
 
 export async function getPendingUsers() {
@@ -70,19 +89,38 @@ export async function updateUserStatus(userId: string, status: Status) {
       return { success: false, error: "Unauthorized access: Admin privileges required." };
     }
 
-    // 1. Update status and fetch applicant details
+    // Fetch existing user record first
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!existingUser) {
+      return { success: false, error: "User record not found." };
+    }
+
+    // Generate AGRI ID if approving and user doesn't have one yet
+    let agriId = existingUser.uniqueAdminId;
+    if (status === Status.APPROVED && !agriId) {
+      agriId = await generateUniqueAgriId();
+    }
+
+    // 1. Update status and save generated ID
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { status },
+      data: {
+        status,
+        uniqueAdminId: agriId,
+      },
       select: {
         email: true,
         fullName: true,
         uniqueAdminId: true,
+        securityPin: true,
       },
     });
 
     // 2. Send email notification if approved
-    if (status === Status.APPROVED) {
+    if (status === Status.APPROVED && updatedUser.uniqueAdminId) {
       const { data, error } = await resend.emails.send({
         from: "AgriTech Onboarding <onboarding@resend.dev>",
         to: [updatedUser.email],
@@ -97,13 +135,17 @@ export async function updateUserStatus(userId: string, status: Status) {
 
             <div style="background-color: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #334155; text-align: center;">
               <p style="margin: 0 0 6px 0; font-size: 11px; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px;">Your Official AGRI-ID</p>
-              <p style="margin: 0; font-family: monospace; font-size: 26px; font-weight: bold; color: #34d399;">
+              <p style="margin: 0 0 16px 0; font-family: monospace; font-size: 28px; font-weight: bold; color: #34d399;">
                 ${updatedUser.uniqueAdminId}
+              </p>
+              <p style="margin: 0 0 6px 0; font-size: 11px; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px;">Your Security PIN</p>
+              <p style="margin: 0; font-family: monospace; font-size: 20px; font-weight: bold; color: #cbd5e1;">
+                ${updatedUser.securityPin}
               </p>
             </div>
 
             <p style="color: #cbd5e1; font-size: 14px;">
-              You can now use this AGRI-ID to log in and access your portal.
+              You can now use these credentials to log in to your portal.
             </p>
           </div>
         `,
@@ -113,6 +155,12 @@ export async function updateUserStatus(userId: string, status: Status) {
         console.error("❌ RESEND API ERROR:", error);
         return { success: false, error: error.message };
       }
+
+      // Mark emailSent flag to true
+      await prisma.user.update({
+        where: { id: userId },
+        data: { emailSent: true },
+      });
 
       console.log("✅ RESEND SUCCESS! Email ID:", data?.id);
     }

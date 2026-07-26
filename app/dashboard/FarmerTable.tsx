@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getFarmerRecords } from "../actions";
+import { getFarmerRecords } from "./actions";
 
 export interface FarmerRecord {
   id: string;
@@ -33,7 +33,7 @@ export default function FarmerTable() {
   const fetchRecords = async () => {
     setIsLoading(true);
     const res = await getFarmerRecords();
-    if (res.success && res.data) {
+    if (res?.success && res?.data) {
       setFarmers(res.data as FarmerRecord[]);
     }
     setIsLoading(false);
@@ -46,9 +46,9 @@ export default function FarmerTable() {
   // Filtered farmers based on Search & Select Dropdowns
   const filteredFarmers = farmers.filter((farmer) => {
     const matchesSearch =
-      farmer.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      farmer.phoneNumber.includes(searchTerm) ||
-      farmer.userGroup.toLowerCase().includes(searchTerm.toLowerCase());
+      (farmer.fullName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (farmer.phoneNumber || "").includes(searchTerm) ||
+      (farmer.userGroup || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesState = selectedState === "" || farmer.state === selectedState;
     const matchesCluster = selectedCluster === "" || farmer.cluster === selectedCluster;
@@ -60,40 +60,107 @@ export default function FarmerTable() {
   const uniqueStates = Array.from(new Set(farmers.map((f) => f.state))).filter(Boolean);
   const uniqueClusters = Array.from(new Set(farmers.map((f) => f.cluster))).filter(Boolean);
 
+  const resetFilters = () => {
+    setSearchTerm("");
+    setSelectedState("");
+    setSelectedCluster("");
+  };
+
   const handlePrint = () => {
     window.print();
   };
 
+  // Export filtered dataset to CSV
+  const exportToCSV = () => {
+    if (filteredFarmers.length === 0) return;
+
+    const headers = [
+      "Full Name",
+      "Age",
+      "Gender",
+      "Education",
+      "Marital Status",
+      "State",
+      "LGA",
+      "Cluster",
+      "User Group",
+      "Enterprise Name",
+      "Enterprise Type",
+      "Estimated Annual Income (NGN)",
+      "Phone Number",
+    ];
+
+    const rows = filteredFarmers.map((f) => [
+      `"${f.fullName}"`,
+      f.age,
+      `"${f.gender}"`,
+      `"${f.highestEducation}"`,
+      `"${f.maritalStatus}"`,
+      `"${f.state}"`,
+      `"${f.lga}"`,
+      `"${f.cluster}"`,
+      `"${f.userGroup}"`,
+      `"${f.nameOfChosenEnterprise}"`,
+      `"${f.typeOfEnterprise}"`,
+      f.estimatedAnnualIncome,
+      `"${f.phoneNumber}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `farmer_records_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const isFiltering = searchTerm !== "" || selectedState !== "" || selectedCluster !== "";
+
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
       
-      {/* HEADER & PRINT ACTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 print:hidden">
+      {/* HEADER & ACTIONS */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 print:mb-2">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Registered Farmers</h2>
           <p className="text-xs text-gray-500">
-            Total Records: <span className="font-semibold text-emerald-700">{filteredFarmers.length}</span>
+            Total Records:{" "}
+            <span className="font-semibold text-emerald-700">{filteredFarmers.length}</span>
+            {isFiltering && (
+              <span className="ml-1 text-gray-400">(Filtered from {farmers.length})</span>
+            )}
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 print:hidden">
           <button
             onClick={fetchRecords}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+            className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition cursor-pointer"
           >
             Refresh
           </button>
           <button
-            onClick={handlePrint}
-            className="px-4 py-2 text-xs font-medium text-white bg-emerald-700 rounded-lg hover:bg-emerald-800 shadow-sm transition"
+            onClick={exportToCSV}
+            className="px-3 py-2 text-xs font-medium text-emerald-800 bg-emerald-100 rounded-lg hover:bg-emerald-200 transition cursor-pointer"
           >
-            Print Summary / Export
+            Export CSV
+          </button>
+          <button
+            onClick={handlePrint}
+            className="px-4 py-2 text-xs font-medium text-white bg-emerald-700 rounded-lg hover:bg-emerald-800 shadow-sm transition cursor-pointer"
+          >
+            Print Summary
           </button>
         </div>
       </div>
 
       {/* FILTER CONTROLS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 print:hidden">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6 print:hidden">
         <input
           type="text"
           placeholder="Search name, phone, or group..."
@@ -103,7 +170,7 @@ export default function FarmerTable() {
         />
 
         <select
-          className="px-3 py-2 text-xs border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-3 py-2 text-xs border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
           value={selectedState}
           onChange={(e) => setSelectedState(e.target.value)}
         >
@@ -116,7 +183,7 @@ export default function FarmerTable() {
         </select>
 
         <select
-          className="px-3 py-2 text-xs border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-3 py-2 text-xs border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
           value={selectedCluster}
           onChange={(e) => setSelectedCluster(e.target.value)}
         >
@@ -127,19 +194,32 @@ export default function FarmerTable() {
             </option>
           ))}
         </select>
+
+        {isFiltering ? (
+          <button
+            onClick={resetFilters}
+            className="px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition cursor-pointer"
+          >
+            Reset Filters
+          </button>
+        ) : (
+          <div />
+        )}
       </div>
 
       {/* TABLE DATA */}
       {isLoading ? (
         <div className="py-12 text-center text-xs text-gray-500">Loading farmer records...</div>
       ) : filteredFarmers.length === 0 ? (
-        <div className="py-12 text-center text-xs text-gray-500">No farmer records found.</div>
+        <div className="py-12 text-center text-xs text-gray-500">
+          No farmer records found matching criteria.
+        </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto print:overflow-visible">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-emerald-50 text-emerald-900 border-b border-emerald-100">
-                <th className="py-3 px-3">Photo</th>
+              <tr className="bg-emerald-50 text-emerald-900 border-b border-emerald-100 print:bg-transparent">
+                <th className="py-3 px-3 print:hidden">Photo</th>
                 <th className="py-3 px-3">Full Name</th>
                 <th className="py-3 px-3">Gender / Age</th>
                 <th className="py-3 px-3">Location (State / LGA)</th>
@@ -152,8 +232,8 @@ export default function FarmerTable() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredFarmers.map((farmer) => (
-                <tr key={farmer.id} className="hover:bg-gray-50 transition">
-                  <td className="py-2 px-3">
+                <tr key={farmer.id} className="hover:bg-gray-50 transition print:hover:bg-transparent">
+                  <td className="py-2 px-3 print:hidden">
                     {farmer.photoUrl ? (
                       <img
                         src={farmer.photoUrl}
@@ -162,7 +242,7 @@ export default function FarmerTable() {
                       />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center font-bold text-[10px]">
-                        {farmer.fullName.charAt(0)}
+                        {farmer.fullName ? farmer.fullName.charAt(0).toUpperCase() : "F"}
                       </div>
                     )}
                   </td>
@@ -174,10 +254,10 @@ export default function FarmerTable() {
                   <td className="py-2 px-3 text-gray-600">
                     <span className="font-medium text-gray-800">{farmer.nameOfChosenEnterprise}</span>
                     <br />
-                    <span className="text-[10px] text-gray-400">{farmer.typeOfEnterprise}</span>
+                    <span className="text-[10px] text-gray-400 print:text-gray-600">{farmer.typeOfEnterprise}</span>
                   </td>
-                  <td className="py-2 px-3 font-medium text-emerald-700">
-                    ₦{farmer.estimatedAnnualIncome.toLocaleString()}
+                  <td className="py-2 px-3 font-medium text-emerald-700 print:text-gray-800">
+                    ₦{(farmer.estimatedAnnualIncome || 0).toLocaleString()}
                   </td>
                   <td className="py-2 px-3 text-gray-600">{farmer.phoneNumber}</td>
                 </tr>

@@ -3,8 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  
+  provider = "postgresql"
 }
 
 enum Role {
@@ -20,8 +19,8 @@ enum Status {
 
 model User {
   id            String   @id @default(uuid())
-  clerkUserId   String   @unique
-  uniqueAdminId String   @unique 
+  clerkUserId   String?  @unique
+  uniqueAdminId String?  @unique 
   securityPin   String   
   fullName      String
   email         String   @unique
@@ -37,7 +36,7 @@ model User {
 }
 
 // ==========================================
-// NEW: Farmer Registration Model for Overview
+// Farmer Registration Model
 // ==========================================
 model Farmer {
   id                     String   @id @default(uuid())

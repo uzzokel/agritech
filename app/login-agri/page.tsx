@@ -1,25 +1,30 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { loginAgriUser } from "@/app/actions/login-agri";
 import { KeyRound, ShieldCheck, Loader2 } from "lucide-react";
 
 export default function AgriLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetRedirect = searchParams.get("redirect") || "/dashboard";
+
   const [state, formAction, isPending] = useActionState(loginAgriUser, {
     success: false,
     error: null,
   });
 
   useEffect(() => {
-    if (state.success) {
-      router.push("/dashboard");
+    if (state?.success) {
+      router.refresh();
+      router.push(targetRedirect);
     }
-  }, [state.success, router]);
+  }, [state?.success, router, targetRedirect]);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 py-30">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
         
         {/* Header */}
@@ -34,7 +39,7 @@ export default function AgriLoginPage() {
         </div>
 
         {/* Error Banner */}
-        {state.error && (
+        {state?.error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center font-medium">
             {state.error}
           </div>
@@ -62,7 +67,7 @@ export default function AgriLoginPage() {
             <div className="relative">
               <input
                 type="password"
-                name="pin"
+                name="securityPin"
                 maxLength={8}
                 placeholder="Enter PIN"
                 required
@@ -75,7 +80,7 @@ export default function AgriLoginPage() {
           <button
             type="submit"
             disabled={isPending}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 disabled:opacity-50"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 disabled:opacity-50 cursor-pointer"
           >
             {isPending ? (
               <>
@@ -86,6 +91,19 @@ export default function AgriLoginPage() {
             )}
           </button>
         </form>
+
+        {/* Registration Quick-Link Footer */}
+        <div className="mt-8 text-center pt-6 border-t border-slate-800">
+          <p className="text-slate-400 text-sm">
+            Haven&apos;t received your AGRI-ID yet?{" "}
+            <Link
+              href="/register-agri"
+              className="text-emerald-400 hover:text-emerald-300 font-medium underline underline-offset-4 transition"
+            >
+              Submit Application
+            </Link>
+          </p>
+        </div>
 
       </div>
     </div>

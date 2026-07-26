@@ -5,7 +5,7 @@ import { getPendingUsers, updateUserStatus } from "@/app/actions/admin-actions";
 
 interface UserRecord {
   id: string;
-  uniqueAdminId: string;
+  uniqueAdminId: string | null;
   fullName: string;
   email: string;
   state: string;
@@ -40,11 +40,10 @@ export default function AdminDashboardPage() {
     loadUsers();
   }, []);
 
-  // PASTE IS HERE 👇
   const handleStatusChange = async (userId: string, newStatus: StatusType) => {
     setActiveUserId(userId);
     try {
-      const res = await updateUserStatus(userId, newStatus);
+      const res = await updateUserStatus(userId, newStatus as any);
       if (res.success) {
         // Optimistically remove the user from the list once updated
         setUsers((prev) => prev.filter((u) => u.id !== userId));
@@ -141,9 +140,15 @@ export default function AdminDashboardPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <code className="text-xs bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-emerald-400 font-mono">
-                            {user.uniqueAdminId}
-                          </code>
+                          {user.uniqueAdminId ? (
+                            <code className="text-xs bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-emerald-400 font-mono">
+                              {user.uniqueAdminId}
+                            </code>
+                          ) : (
+                            <span className="text-xs text-slate-500 italic">
+                              Will assign on approval
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-xs text-slate-400">
                           {new Date(user.createdAt).toLocaleDateString("en-US", {

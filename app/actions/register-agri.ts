@@ -3,11 +3,6 @@
 import { prisma } from "@/lib/prisma";
 import { auth, currentUser } from "@clerk/nextjs/server";
 
-function generateUniqueAgriId(): string {
-  const randomNum = Math.floor(100000 + Math.random() * 900000);
-  return `AGRI-${randomNum}`;
-}
-
 export async function registerAgriUser(formData: {
   fullName: string;
   email: string;
@@ -17,39 +12,32 @@ export async function registerAgriUser(formData: {
   phoneNumber?: string;
   securityPin: string;
 }) {
-  const { userId } = await auth();
-  const user = await currentUser();
-
-  const targetEmail = formData.email || user?.emailAddresses[0]?.emailAddress;
-
-  if (!targetEmail) {
-    return { success: false, error: "A valid email address is required." };
-  }
-
-  // 👈 1. Only check if THIS specific email address already exists
-  const existingUser = await prisma.user.findFirst({
-    where: { email: targetEmail },
-  });
-
-  if (existingUser) {
-    return {
-      success: false,
-      error: `An application with email (${targetEmail}) already exists. Current status: ${existingUser.status}`,
-    };
-  }
-
   try {
-    const uniqueAdminId = generateUniqueAgriId();
+    const { userId } = await auth();
+    const user = await currentUser();
 
-    // 👈 2. Generate a unique ID key so Clerk logins don't clash during testing
-    const uniqueClerkId = userId 
-      ? `${userId}_${Date.now()}` 
-      : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const targetEmail = (formData.email || user?.emailAddresses[0]?.emailAddress)?.trim().toLowerCase();
 
+    if (!targetEmail) {
+      return { success: false, error: "A valid email address is required." };
+    }
+
+    // 1. Check for duplicate registration by email
+    const existingUser = await prisma.user.findUnique({
+      where: { email: targetEmail },
+    });
+
+    if (existingUser) {
+      return {
+        success: false,
+        error: `An application with email (${targetEmail}) already exists. Current status: ${existingUser.status}`,
+      };
+    }
+
+    // 2. Create record with explicit null uniqueAdminId
     await prisma.user.create({
       data: {
-        clerkUserId: uniqueClerkId,
-        uniqueAdminId: uniqueAdminId,
+        clerkUserId: userId || null,
         securityPin: formData.securityPin,
         fullName: formData.fullName,
         email: targetEmail,
@@ -58,12 +46,26 @@ export async function registerAgriUser(formData: {
         designation: formData.designation,
         phoneNumber: formData.phoneNumber || null,
         status: "PENDING",
+        uniqueAdminId: null, // 👈 Fix: Explicitly pass null for optional unique fields
       },
     });
 
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Registration error:", error);
-    return { success: false, error: "Failed to submit application. Please try again." };
+
+    // Handle duplicate key error from Prisma (e.g. Unique email or Clerk ID)
+    if (error?.code === "P2002") {
+      const field = error?.meta?.target?.[0] || "field";
+      return {
+        success: false,
+        error: `An account with this ${field} already exists.`,
+      };
+    }
+
+    return {
+      success: false,
+      error: error?.message || "Failed to submit application. Please try again.",
+    };
   }
 }

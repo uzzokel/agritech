@@ -1,21 +1,21 @@
-// components/ApproveButton.tsx
 'use client';
 
 import { useState } from 'react';
-import { approveUser } from '@/app/actions/user';
+import { updateUserStatus } from '@/app/actions/admin-actions';
+import { Status } from '@prisma/client';
 
 export function ApproveButton({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false);
 
   async function handleApprove() {
     setLoading(true);
-    const result = await approveUser(userId);
+    const result = await updateUserStatus(userId, Status.APPROVED);
     setLoading(false);
 
     if (result.success) {
-      alert('User approved! Unique ID sent to email.');
+      alert('User approved! Unique AGRI-ID and Security PIN sent via email.');
     } else {
-      alert('Failed to approve user.');
+      alert(result.error || 'Failed to approve user.');
     }
   }
 
@@ -23,7 +23,7 @@ export function ApproveButton({ userId }: { userId: string }) {
     <button
       onClick={handleApprove}
       disabled={loading}
-      className="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 disabled:opacity-50"
+      className="bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium rounded hover:bg-emerald-700 disabled:opacity-50 transition-colors"
     >
       {loading ? 'Approving...' : 'Approve User'}
     </button>

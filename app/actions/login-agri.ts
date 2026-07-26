@@ -6,15 +6,15 @@ import { Status } from "@prisma/client";
 
 export async function loginAgriUser(prevState: any, formData: FormData) {
   const uniqueAdminId = (formData.get("uniqueAdminId") as string)?.trim().toUpperCase();
-  const pin = (formData.get("pin") as string)?.trim();
+  const pin = ((formData.get("pin") || formData.get("securityPin")) as string)?.trim();
 
   if (!uniqueAdminId || !pin) {
-    return { success: false, error: "Please enter both your AGRI-ID and 4-digit PIN." };
+    return { success: false, error: "Please enter both your AGRI-ID and Security PIN." };
   }
 
   try {
     // 1. Look up user by unique AGRI-ID
-    const user = await prisma.user.findFirst({
+    const user = await prisma.user.findUnique({
       where: { uniqueAdminId },
     });
 
@@ -37,7 +37,7 @@ export async function loginAgriUser(prevState: any, formData: FormData) {
       };
     }
 
-    // 3. Verify security PIN 👈 Updated to match schema property
+    // 3. Verify security PIN
     if (user.securityPin !== pin) {
       return { success: false, error: "Invalid AGRI-ID or Security PIN." };
     }
@@ -49,7 +49,7 @@ export async function loginAgriUser(prevState: any, formData: FormData) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
     });
 
     return { success: true, error: null };

@@ -8,7 +8,9 @@ import Social from "./Social";
 import LoginButton from "./SignIn";
 import MobileMenu from "./MobileMenu"; 
 import { HiMenu, HiX } from "react-icons/hi"; 
-import { SignInButton, UserButton, Show, useUser } from "@clerk/nextjs";
+import { UserButton, Show, useUser, useClerk } from "@clerk/nextjs";
+import { deleteAgriSessionCookie } from "@/app/actions/logout-agri";
+import { LogOut } from "lucide-react";
 
 const ADMIN_EMAILS = [
   "uzzokel@gmail.com",
@@ -19,8 +21,21 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState<boolean>(false); 
 
   const { user } = useUser();
+  const { signOut } = useClerk();
+  
   const primaryEmail = user?.primaryEmailAddress?.emailAddress;
   const isAdmin = primaryEmail ? ADMIN_EMAILS.includes(primaryEmail) : false;
+
+  const handleCustomSignOut = async () => {
+    try {
+      // 1. Clear AGRI session cookie on server
+      await deleteAgriSessionCookie();
+      // 2. Sign out of Clerk and redirect to login
+      await signOut({ redirectUrl: "/login-agri" });
+    } catch (error) {
+      console.error("Signout error:", error);
+    }
+  };
 
   useEffect(() => {
     if (menuOpen) {
@@ -90,13 +105,20 @@ export default function Navbar() {
                           userButtonAvatarBox: "w-9 h-9 border border-emerald-500/20 hover:scale-105 transition duration-200",
                         }
                       }}
-                    />
+                    >
+                      <UserButton.MenuItems>
+                        <UserButton.Action
+                          label="Log out of AgriTech"
+                          labelIcon={<LogOut className="w-4 h-4 text-red-500" />}
+                          onClick={handleCustomSignOut}
+                        />
+                      </UserButton.MenuItems>
+                    </UserButton>
                   </div>
                 </Show>
               </div>
 
               {/* Mobile Hamburger Toggle Button */}
-              {/* FIX: Set text-white when NOT scrolled so it is visible over your primary hero color */}
               <button 
                 className={`lg:hidden text-3xl focus:outline-none transition-all duration-300 hover:scale-110 cursor-pointer ${
                   isScrolled ? "text-slate-800" : "text-white"
