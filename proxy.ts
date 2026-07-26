@@ -1,45 +1,37 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+// proxy.ts (or middleware.ts)
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-// 1. Routes that require BOTH Clerk sign-in and AGRI ID/PIN verification
-const isProtectedAgriRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/features(.*)",
-  "/blog(.*)",
-]);
-
-// 2. Auth routes that logged-in AGRI members shouldn't need to re-visit
-const isAgriAuthRoute = createRouteMatcher([
-  "/login-agri(.*)",
-  "/register-agri(.*)",
-]);
+// Define protected and auth paths as standard prefixes/regex
+const protectedPaths = ["/dashboard", "/features", "/blog"];
+const authPaths = ["/login-agri", "/register-agri"];
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId } = await auth(); // Check Clerk authentication state
-  const agriSession = req.cookies.get("agri_session_id"); // Check AGRI PIN verification
+  const { userId } = await auth();
+  const { pathname } = req.nextUrl;
+  const agriSession = req.cookies.get("agri_session_id");
 
-  // CHECK 1: Protecting /dashboard, /features, /blog
-  if (isProtectedAgriRoute(req)) {
-    // A. User is NOT signed into Clerk -> force Clerk Sign-In / Register first
+  const isProtectedAgriRoute = protectedPaths.some((path) =>
+    pathname.startsWith(path)
+  );
+  const isAgriAuthRoute = authPaths.some((path) =>
+    pathname.startsWith(path)
+  );
+
+  // CHECK 1: Protect /dashboard, /features, /blog
+  if (isProtectedAgriRoute) {
     if (!userId) {
-      console.log(`🔒 Clerk user missing! Redirecting ${req.nextUrl.pathname} to /register-agri`);
+      console.log(`🔒 Clerk user missing! Redirecting ${pathname} to /register-agri`);
       const registerUrl = new URL("/register-agri", req.url);
-      registerUrl.searchParams.set("redirect", req.nextUrl.pathname);
+      registerUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(registerUrl);
     }
-
-    // B. User IS signed into Clerk, BUT hasn't submitted their AGRI-ID & PIN yet -> send to /login-agri
-    if (!agriSession) {
-      console.log(`🔑 AGRI PIN missing! Redirecting ${req.nextUrl.pathname} to /login-agri`);
-      const loginUrl = new URL("/login-agri", req.url);
-      loginUrl.searchParams.set("redirect", req.nextUrl.pathname);
-      return NextResponse.redirect(loginUrl);
-    }
+    // Signed-in Clerk users proceed to page server components where protectAgriRoute() checks Prisma!
   }
 
-  // CHECK 2: User with an active AGRI session visiting /login-agri or /register-agri -> send straight to /dashboard
-  if (isAgriAuthRoute(req) && agriSession && userId) {
-    console.log(`⚡ Active Clerk + AGRI session detected! Redirecting away from ${req.nextUrl.pathname} to /dashboard`);
+  // CHECK 2: Prevent users with an active AGRI session from visiting auth pages
+  if (isAgriAuthRoute && agriSession && userId) {
+    console.log(`⚡ Active Clerk + AGRI session detected! Redirecting away from ${pathname} to /dashboard`);
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 });

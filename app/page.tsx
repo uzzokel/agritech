@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { theme } from "@/app/components/Styles";
 import Link from "next/link";
-import { SignInButton, SignUpButton, UserButton, Show } from '@clerk/nextjs';
+import { SignInButton, SignUpButton, Show } from '@clerk/nextjs';
 import RollingTicker from './components/RollingTicker';
 import LiveTimer from './components/LiveTimer';
 
@@ -76,14 +76,17 @@ export default function Page() {
                 </Show>
 
                 <Show when="signed-in">
-                  <Link href="/features" className="px-8 py-3 text-white font-semibold rounded-full text-base shadow-md transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer text-center" style={{ backgroundColor: secondaryColor }}>
+                  <Link href="/features" className="px-6 py-3 text-white font-semibold rounded-full text-base shadow-md transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer text-center" style={{ backgroundColor: secondaryColor }}>
                     Explore Features
                   </Link>
-                  
-                  <div className="flex items-center gap-3 bg-white/5 border border-white/10 py-2 px-4 rounded-full shadow-sm">
-                    <span className="text-sm font-medium text-slate-300">Account:</span>
-                    <UserButton />
-                  </div>
+
+                  {/* Direct Link to Agri Login Form */}
+                  <Link 
+                    href="/login-agri" 
+                    className="px-6 py-3 border border-emerald-400/50 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-semibold rounded-full text-base transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer text-center"
+                  >
+                    Enter ID & PIN
+                  </Link>
                 </Show>
               </div>
             </div>

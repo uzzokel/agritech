@@ -8,9 +8,14 @@ export async function sendApprovalEmail(
   uniqueId: string, 
   securityPin: string
 ) {
+  // Routes emails to your account in dev mode to bypass Resend domain verification limits
+  const recipientEmail = process.env.NODE_ENV === "development" 
+    ? "uzzokel@gmail.com" 
+    : userEmail;
+
   return await resend.emails.send({
     from: 'onboarding@resend.dev', // Resend's default test address
-    to: userEmail,
+    to: recipientEmail,
     subject: 'Account Approved - Your Unique ID & PIN',
     html: `
       <div style="font-family: sans-serif; padding: 20px; color: #1e293b; max-width: 500px;">
