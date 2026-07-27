@@ -1,60 +1,50 @@
+// app/actions/login-agri.ts
 "use server";
 
-import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
-import { Status } from "@prisma/client";
+import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/prisma";
 
 export async function loginAgriUser(prevState: any, formData: FormData) {
   const uniqueAdminId = (formData.get("uniqueAdminId") as string)?.trim().toUpperCase();
-  const pin = ((formData.get("pin") || formData.get("securityPin")) as string)?.trim();
+  const securityPin = (formData.get("securityPin") as string)?.trim();
 
-  if (!uniqueAdminId || !pin) {
-    return { success: false, error: "Please enter both your AGRI-ID and Security PIN." };
+  if (!uniqueAdminId || !securityPin) {
+    return { success: false, error: "AGRI-ID and PIN are required." };
   }
 
-  try {
-    // 1. Look up user by unique AGRI-ID
-    const user = await prisma.user.findUnique({
-      where: { uniqueAdminId },
-    });
+  const user = await prisma.user.findUnique({
+    where: { uniqueAdminId },
+  });
 
-    if (!user) {
-      return { success: false, error: "Invalid AGRI-ID or Security PIN." };
-    }
-
-    // 2. Status verification
-    if (user.status === Status.PENDING) {
-      return { 
-        success: false, 
-        error: "Your application is still under review. Please wait for email approval." 
-      };
-    }
-
-    if (user.status === Status.DENIED) {
-      return { 
-        success: false, 
-        error: "Your registration was not approved. Contact support for assistance." 
-      };
-    }
-
-    // 3. Verify security PIN
-    if (user.securityPin !== pin) {
-      return { success: false, error: "Invalid AGRI-ID or Security PIN." };
-    }
-
-    // 4. Save HTTP-only session cookie (valid for 7 days)
-    const cookieStore = await cookies();
-    cookieStore.set("agri_session_id", user.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-    });
-
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("❌ Login action error:", error);
-    return { success: false, error: "Authentication failed. Please try again." };
+  if (!user || !user.uniqueAdminId) {
+    return { success: false, error: "Invalid AGRI-ID or Security PIN." };
   }
+
+  if (user.status !== "APPROVED") {
+    return { success: false, error: "Your account is pending admin approval." };
+  }
+
+  if (user.securityPin !== securityPin) {
+    return { success: false, error: "Invalid AGRI-ID or Security PIN." };
+  }
+
+  const { userId: clerkUserId } = await auth();
+  if (clerkUserId && !user.clerkUserId) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { clerkUserId },
+    });
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set("agri_session_verified", user.uniqueAdminId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 8, // 8 hours
+  });
+
+  return { success: true, error: null };
 }

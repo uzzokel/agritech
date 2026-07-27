@@ -1,7 +1,12 @@
+// app/blog/page.tsx
+import { protectAgriRoute } from "@/lib/protect-route";
 import { BookOpen, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default function BlogPage() {
+export default async function BlogPage() {
+  // 🔒 Enforces Clerk auth + DB registration + approval status + PIN session
+  const dbUser = await protectAgriRoute();
+
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
       <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-lg text-center shadow-2xl">
@@ -10,7 +15,7 @@ export default function BlogPage() {
         </div>
         <h1 className="text-3xl font-bold text-emerald-400 mb-2">AgriTech Insights & Blog</h1>
         <p className="text-slate-400 text-sm mb-6">
-          Access granted! Latest agricultural updates, policy guidance, and regional farming reports will be posted here.
+          Access granted, {dbUser.fullName}! Latest agricultural updates, policy guidance, and regional farming reports will be posted here.
         </p>
 
         <Link

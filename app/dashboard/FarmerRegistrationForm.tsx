@@ -1,13 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { uploadFarmerPhoto, createFarmerRecord } from "@/app/dashboard/actions";
 
 interface FarmerFormProps {
   onSuccess?: () => void;
+  user?: {
+    id?: string;
+    fullName?: string;
+    email?: string;
+    designation?: string;
+    lga?: string;
+    state?: string;
+    [key: string]: any;
+  };
 }
 
-export default function FarmerRegistrationForm({ onSuccess }: FarmerFormProps) {
+export default function FarmerRegistrationForm({ onSuccess, user }: FarmerFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -20,8 +29,8 @@ export default function FarmerRegistrationForm({ onSuccess }: FarmerFormProps) {
     highestEducation: "Secondary",
     maritalStatus: "Single",
     householdSize: "",
-    state: "",
-    lga: "",
+    state: user?.state || "",
+    lga: user?.lga || "",
     cluster: "",
     userGroup: "",
     nameOfChosenEnterprise: "",
@@ -32,15 +41,31 @@ export default function FarmerRegistrationForm({ onSuccess }: FarmerFormProps) {
 
   const [formData, setFormData] = useState(initialFormData);
 
+  useEffect(() => {
+    if (user?.state || user?.lga) {
+      setFormData((prev) => ({
+        ...prev,
+        state: prev.state || user.state || "",
+        lga: prev.lga || user.lga || "",
+      }));
+    }
+  }, [user]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
-    // Clear householdSize if maritalStatus changes away from Married
     if (name === "maritalStatus" && value !== "Married") {
       setFormData({ ...formData, maritalStatus: value, householdSize: "" });
     } else {
       setFormData({ ...formData, [name]: value });
     }
+  };
+
+  // Safe scroll helper to avoid shaking the outer dashboard viewport
+  const scrollToTop = (e: React.FormEvent) => {
+    const target = e.currentTarget as HTMLElement;
+    const parentContainer = target.closest("main") || window;
+    parentContainer.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,7 +77,6 @@ export default function FarmerRegistrationForm({ onSuccess }: FarmerFormProps) {
     try {
       let photoUrl: string | null = null;
 
-      // 1. Upload photo if provided
       if (photoFile) {
         const photoData = new FormData();
         photoData.append("photo", photoFile);
@@ -61,13 +85,12 @@ export default function FarmerRegistrationForm({ onSuccess }: FarmerFormProps) {
         if (!uploadRes.success) {
           setError(uploadRes.error || "Failed to upload photo");
           setLoading(false);
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          scrollToTop(e);
           return;
         }
         photoUrl = uploadRes.url || null;
       }
 
-      // 2. Save Farmer Record to Database
       const result = await createFarmerRecord({
         fullName: formData.fullName,
         age: parseInt(formData.age, 10),
@@ -89,22 +112,19 @@ export default function FarmerRegistrationForm({ onSuccess }: FarmerFormProps) {
       });
 
       if (result.success) {
-        // Show success alert & reset form
         setSuccessMessage("🎉 Farmer registered successfully!");
         setFormData(initialFormData);
         setPhotoFile(null);
-
-        // Scroll up to ensure the green banner is visible
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        scrollToTop(e);
 
         if (onSuccess) onSuccess();
       } else {
         setError(result.error || "Failed to create record");
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        scrollToTop(e);
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop(e);
     } finally {
       setLoading(false);
     }
@@ -221,7 +241,6 @@ export default function FarmerRegistrationForm({ onSuccess }: FarmerFormProps) {
           </select>
         </div>
 
-        {/* CONDITIONAL FIELD: Family/Household Size for Married Farmers */}
         {formData.maritalStatus === "Married" && (
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">

@@ -2,7 +2,6 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-
 export async function protectAgriRoute() {
   // 1. Check if user is authenticated with Clerk
   const clerkUser = await currentUser();

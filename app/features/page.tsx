@@ -1,7 +1,12 @@
+// app/features/page.tsx
+import { protectAgriRoute } from "@/lib/protect-route";
 import { Sparkles, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default function FeaturesPage() {
+export default async function FeaturesPage() {
+  // 🔒 Enforces Clerk auth + DB registration + approval status + PIN session
+  const dbUser = await protectAgriRoute();
+
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
       <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-lg text-center shadow-2xl">
@@ -10,7 +15,7 @@ export default function FeaturesPage() {
         </div>
         <h1 className="text-3xl font-bold text-emerald-400 mb-2">AgriTech Features Hub</h1>
         <p className="text-slate-400 text-sm mb-6">
-          Access granted! You are verified with an active AGRI session. Regional tools, extension analytics, and crop insights will live here.
+          Access granted, {dbUser.fullName}! You are verified with an active AGRI session. Regional tools, extension analytics, and crop insights will live here.
         </p>
 
         <Link
