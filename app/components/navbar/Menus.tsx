@@ -2,13 +2,19 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { theme } from "../Styles";
 
 interface MenusProps {
   isScrolled: boolean;
+  isAdmin?: boolean;
 }
 
-export default function Menus({ isScrolled }: MenusProps) {
+export default function Menus({ isScrolled, isAdmin = false }: MenusProps) {
+  const pathname = usePathname();
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLLIElement>(null);
+
   const menuItems = [
     { label: "Home", path: "/" },
     { label: "Features", path: "/features" },
@@ -18,16 +24,14 @@ export default function Menus({ isScrolled }: MenusProps) {
     { label: "Projects", path: "/projects" },
   ];
 
+  // Dynamic filter based on admin clearance
   const dashboardDropdownItems = [
-    { label: "Overview", path: "/dashboard" },
-    { label: "Predict Impact", path: "/dashboard/predict-impact" },
-    { label: "Reports", path: "/dashboard/reports" }
-  ];
+    { label: "Overview", path: "/dashboard", adminOnly: false },
+    { label: "Predict Impact", path: "/dashboard/predict-impact", adminOnly: true },
+    { label: "Reports", path: "/dashboard/reports", adminOnly: false }
+  ].filter(item => !item.adminOnly || isAdmin);
 
-  const [activeMenuItem, setActiveMenuItem] = useState<string>("Home");
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const dropdownRef = useRef<HTMLLIElement>(null);
-
+  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -38,7 +42,8 @@ export default function Menus({ isScrolled }: MenusProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // FIX: When NOT scrolled, menus render as high-contrast white to stand out cleanly against the navy hero background
+  const isDashboardActive = pathname?.startsWith("/dashboard");
+
   const getRestingStyle = () => {
     if (isScrolled) {
       return { color: theme.primaryColor, opacity: 1 };
@@ -50,17 +55,14 @@ export default function Menus({ isScrolled }: MenusProps) {
     <ul className="hidden lg:flex text-lg items-center gap-5 font-medium">
       {/* Standard Links */}
       {menuItems.map((item, i) => {
-        const isActive = activeMenuItem === item.label;
+        const isActive = pathname === item.path;
         const linkStyle = isActive ? { color: theme.secondaryColor } : getRestingStyle();
 
         return (
           <li key={i}>
             <Link 
               href={item.path} 
-              onClick={() => {
-                setActiveMenuItem(item.label);
-                setIsDropdownOpen(false);
-              }} 
+              onClick={() => setIsDropdownOpen(false)} 
               style={linkStyle}
               className="relative nav-menu transition-all duration-300 cursor-pointer hover:opacity-100"
             >
@@ -74,7 +76,7 @@ export default function Menus({ isScrolled }: MenusProps) {
       <li className="relative" ref={dropdownRef}>
         <button
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          style={activeMenuItem === "Dashboard" ? { color: theme.secondaryColor } : getRestingStyle()}
+          style={isDashboardActive ? { color: theme.secondaryColor } : getRestingStyle()}
           className="flex items-center gap-1 transition-all duration-300 cursor-pointer hover:opacity-100 font-medium text-lg bg-transparent border-none outline-none"
         >
           Dashboard
@@ -88,28 +90,32 @@ export default function Menus({ isScrolled }: MenusProps) {
           <div 
             className="absolute left-0 mt-2 w-48 rounded-lg border border-white/20 p-1 z-50 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200"
             style={{ 
-              backgroundColor: `${theme.primaryColor}cc` // Adds 'cc' hex transparency (80% opacity) for that light, glass look
+              backgroundColor: `${theme.primaryColor}cc`
             }}
           >
-            {dashboardDropdownItems.map((subItem, index) => (
-              <Link
-                key={index}
-                href={subItem.path}
-                onClick={() => {
-                  setActiveMenuItem("Dashboard");
-                  setIsDropdownOpen(false);
-                }}
-                className="block px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 text-white/90 hover:bg-white/10"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = theme.secondaryColor;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.9)";
-                }}
-              >
-                {subItem.label}
-              </Link>
-            ))}
+            {dashboardDropdownItems.map((subItem, index) => {
+              const isSubActive = pathname === subItem.path;
+              
+              return (
+                <Link
+                  key={index}
+                  href={subItem.path}
+                  onClick={() => setIsDropdownOpen(false)}
+                  className="block px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 hover:bg-white/10"
+                  style={{
+                    color: isSubActive ? theme.secondaryColor : "rgba(255, 255, 255, 0.9)"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = theme.secondaryColor;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = isSubActive ? theme.secondaryColor : "rgba(255, 255, 255, 0.9)";
+                  }}
+                >
+                  {subItem.label}
+                </Link>
+              );
+            })}
           </div>
         )}
       </li>

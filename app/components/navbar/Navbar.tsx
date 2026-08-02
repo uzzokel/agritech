@@ -74,7 +74,7 @@ export default function Navbar() {
           {/* Right Side: Navigation controls */}
           <div className="flex items-center gap-4 lg:gap-16">
             <nav className="hidden lg:block">
-              <Menus isScrolled={isScrolled} />
+              <Menus isScrolled={isScrolled} isAdmin={isAdmin} />
             </nav>
             
             <div className="flex items-center gap-2 sm:gap-4 z-50">

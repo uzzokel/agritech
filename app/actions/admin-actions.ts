@@ -121,14 +121,18 @@ export async function updateUserStatus(userId: string, status: Status) {
 
     // 2. Send email notification if approved
     if (status === Status.APPROVED && updatedUser.uniqueAdminId) {
+      // DEV SAFEGUARD: Route recipient to ADMIN_EMAIL in dev mode to bypass Resend test domain restriction
+      const isDev = process.env.NODE_ENV === "development";
+      const targetEmail = isDev ? ADMIN_EMAIL : updatedUser.email;
+
       const { data, error } = await resend.emails.send({
         from: "AgriTech Onboarding <onboarding@resend.dev>",
-        to: [updatedUser.email],
+        to: [targetEmail],
         subject: "🎉 Application Approved - Your AGRI-ID Access Details",
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 12px;">
             <h2 style="color: #10b981; margin-bottom: 8px;">Application Approved!</h2>
-            <p style="color: #94a3b8; font-size: 15px;">Hello <strong>${updatedUser.fullName}</strong>,</p>
+            <p style="color: #94a3b8; font-size: 15px;">Hello <strong>${updatedUser.fullName}</strong> (${updatedUser.email}),</p>
             <p style="color: #cbd5e1; line-height: 1.5;">
               Your registration request has been reviewed and officially approved by the admin team.
             </p>

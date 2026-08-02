@@ -1,14 +1,15 @@
+// app/login-agri/page.tsx
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginAgriUser } from "@/app/actions/login-agri";
 import { KeyRound, ShieldCheck, Loader2 } from "lucide-react";
 
 export default function AgriLoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  // Get redirect target from query string (e.g. /login-agri?redirect=/features)
   const targetRedirect = searchParams.get("redirect") || "/dashboard";
 
   const [state, formAction, isPending] = useActionState(loginAgriUser, {
@@ -18,10 +19,10 @@ export default function AgriLoginPage() {
 
   useEffect(() => {
     if (state?.success) {
-      router.refresh();
-      router.push(targetRedirect);
+      // Force hard navigation so protectAgriRoute immediately detects the new session cookie
+      window.location.href = targetRedirect;
     }
-  }, [state?.success, router, targetRedirect]);
+  }, [state?.success, targetRedirect]);
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 py-30">
@@ -47,6 +48,9 @@ export default function AgriLoginPage() {
 
         {/* Form */}
         <form action={formAction} className="space-y-5">
+          {/* Dynamic target destination passed directly to the Server Action */}
+          <input type="hidden" name="redirectTo" value={targetRedirect} />
+
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
               Official AGRI-ID
@@ -68,7 +72,7 @@ export default function AgriLoginPage() {
               <input
                 type="password"
                 name="securityPin"
-                maxLength={8}
+                maxLength={10}
                 placeholder="Enter PIN"
                 required
                 className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-3 font-mono tracking-widest text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50"

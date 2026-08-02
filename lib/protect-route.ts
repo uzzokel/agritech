@@ -1,63 +1,73 @@
 // lib/protect-route.ts
-import { currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
+const ADMIN_EMAILS = ["uzzokel@gmail.com"];
+
 export async function protectAgriRoute() {
-  // 1. Check if user is authenticated with Clerk
+  // Get current pathname from incoming headers for seamless redirect targeting
+  const headersList = await headers();
+  const currentPath = headersList.get("x-pathname") || headersList.get("next-url") || "/dashboard";
+
+  // 1. Clerk Authentication Check
+  const { userId } = await auth();
+  if (!userId) {
+    redirect(`/login-agri?redirect=${encodeURIComponent(currentPath)}`);
+  }
+
+  // 2. ADMIN FAST-PASS: Check primary email via currentUser()
   const clerkUser = await currentUser();
-  if (!clerkUser) {
-    console.log("[AgriAuth] ❌ No Clerk session found. Redirecting to /sign-in");
-    redirect("/sign-in");
+  const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
+
+  if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
+    const firstName = clerkUser?.firstName || "";
+    const lastName = clerkUser?.lastName || "";
+    const fullName = `${firstName} ${lastName}`.trim() || "Admin";
+
+    // Admins bypass registration, approval status, and PIN checks completely
+    return {
+      id: clerkUser?.id || userId,
+      clerkUserId: userId,
+      email: userEmail,
+      fullName,
+      role: "ADMIN",
+      status: "APPROVED",
+      agriId: "AGRI-ADMIN-001",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 
-  const primaryEmail = clerkUser.emailAddresses[0]?.emailAddress?.toLowerCase().trim();
-  if (!primaryEmail) {
-    console.log("[AgriAuth] ❌ No primary email on Clerk account. Redirecting to /sign-in");
-    redirect("/sign-in");
+  // 3. Query Prisma User Status (For regular users)
+  let dbUser = null;
+  try {
+    dbUser = await prisma.user.findFirst({
+      where: { clerkUserId: userId },
+    });
+  } catch (error) {
+    console.error("Error fetching user in protectAgriRoute:", error);
   }
 
-  // 2. Query Prisma by clerkUserId OR email (Case-insensitive check)
-  let dbUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { clerkUserId: clerkUser.id },
-        { email: { equals: primaryEmail, mode: "insensitive" } },
-      ],
-    },
-  });
-
-  // STATE 1: No record found in DB -> Brand new user must complete application form
+  // 4. User hasn't completed registration form
   if (!dbUser) {
-    console.log(`[AgriAuth] ❌ User '${primaryEmail}' (Clerk ID: ${clerkUser.id}) has no DB record. Redirecting to /register-agri`);
     redirect("/register-agri");
   }
 
-  // Auto-link clerkUserId if it was missing from the DB record
-  if (!dbUser.clerkUserId) {
-    await prisma.user.update({
-      where: { id: dbUser.id },
-      data: { clerkUserId: clerkUser.id },
-    });
-  }
-
-  // STATE 2: User record exists, but status is PENDING or DENIED
+  // 5. User registered BUT NOT YET APPROVED
   if (dbUser.status !== "APPROVED") {
-    console.log(`[AgriAuth] ⚠️ User '${primaryEmail}' status is '${dbUser.status}'. Redirecting to /pending-approval`);
     redirect("/pending-approval");
   }
 
-  // STATE 3: Check AGRI-ID & PIN session cookie
+  // 6. User IS APPROVED -> Check active Security PIN session (Regular users only)
   const cookieStore = await cookies();
   const agriSession = cookieStore.get("agri_session_verified")?.value;
 
-  // Validate that the session cookie exists AND matches this user's uniqueAdminId
-  if (!agriSession || agriSession !== dbUser.uniqueAdminId) {
-    console.log(`[AgriAuth] 🔒 User '${primaryEmail}' missing/invalid PIN cookie (Expected: ${dbUser.uniqueAdminId}, Got: ${agriSession}). Redirecting to /login-agri`);
-    redirect("/login-agri");
+  if (!agriSession || agriSession !== dbUser.id) {
+    // Pass the destination target back to /login-agri
+    redirect(`/login-agri?redirect=${encodeURIComponent(currentPath)}`);
   }
 
-  // STATE 4: All security checks passed! Return verified user
   return dbUser;
 }

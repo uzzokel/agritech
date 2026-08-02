@@ -5,11 +5,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@supabase/supabase-js";
+import { auth, currentUser } from "@clerk/nextjs/server";
 
-/**
- * Lazy initializer for Supabase client to prevent crashes if ENV vars are missing.
- * Prioritizes SUPABASE_SERVICE_ROLE_KEY for server-side operations to bypass RLS restrictions.
- */
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
@@ -25,26 +22,24 @@ function getSupabaseClient() {
 }
 
 export interface CreateFarmerInput {
+  createdById?: string;
   fullName: string;
-  age: number;
+  age: number | string;
   gender: string;
   highestEducation: string;
   maritalStatus: string;
-  householdSize?: number | null;
+  householdSize?: number | string | null;
   state: string;
   lga: string;
   cluster: string;
   userGroup: string;
   nameOfChosenEnterprise: string;
   typeOfEnterprise: string;
-  estimatedAnnualIncome: number;
+  estimatedAnnualIncome: number | string;
   phoneNumber: string;
   photoUrl?: string | null;
 }
 
-/**
- * 1. Action to Upload Farmer Photo to Supabase Storage Bucket
- */
 export async function uploadFarmerPhoto(
   formData: FormData
 ): Promise<{ success: boolean; url?: string | null; error?: string }> {
@@ -55,8 +50,6 @@ export async function uploadFarmerPhoto(
     }
 
     const supabase = getSupabaseClient();
-    
-    // Clean file extension and create safe filename
     const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const cleanFileName = `farmer-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
     const filePath = `farmer-photos/${cleanFileName}`;
@@ -84,28 +77,119 @@ export async function uploadFarmerPhoto(
   }
 }
 
-/**
- * 2. Server Action to Save Farmer Record into Prisma Database
- */
 export async function createFarmerRecord(data: CreateFarmerInput) {
   try {
+    const cookieStore = await cookies();
+    let agentId = data.createdById; // Explicitly supplied ID if provided
+
+    // 1. Prioritize active Clerk Session -> Link to DB User ID
+    if (!agentId) {
+      const { userId: clerkUserId } = await auth();
+
+      if (clerkUserId) {
+        let dbUser = await prisma.user.findFirst({
+          where: { clerkUserId },
+          select: { id: true },
+        });
+
+        // Fallback: If clerkUserId is not mapped yet, match via Clerk email
+        if (!dbUser) {
+          const clerkUser = await currentUser();
+          const primaryEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
+
+          if (primaryEmail) {
+            dbUser = await prisma.user.findFirst({
+              where: { email: primaryEmail },
+              select: { id: true },
+            });
+
+            // Auto-sync clerkUserId to database user profile
+            if (dbUser) {
+              await prisma.user.update({
+                where: { id: dbUser.id },
+                data: { clerkUserId },
+              });
+            }
+          }
+        }
+
+        if (dbUser) {
+          agentId = dbUser.id;
+        }
+      }
+    }
+
+    // 2. Lookup by PIN session cookie
+    if (!agentId) {
+      agentId = cookieStore.get("agri_session_id")?.value;
+    }
+
+    // 3. Lookup by uniqueAdminId session cookie
+    if (!agentId) {
+      const verifiedAdminId = cookieStore.get("agri_session_verified")?.value;
+      if (verifiedAdminId) {
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { uniqueAdminId: verifiedAdminId },
+              { id: verifiedAdminId },
+            ],
+          },
+          select: { id: true },
+        });
+        if (user) agentId = user.id;
+      }
+    }
+
+    if (!agentId) {
+      return {
+        success: false,
+        error: "No active user or agent profile found. Please ensure you are logged in.",
+      };
+    }
+
+    // Ensure session cookie reflects current active agent database ID
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    };
+    cookieStore.set("agri_session_id", agentId, cookieOptions);
+
+    // Save farmer record with explicit foreign key relation to User (createdById)
     const newFarmer = await prisma.farmer.create({
       data: {
         fullName: data.fullName,
-        age: data.age,
+        age: Number(data.age) || 0,
         gender: data.gender,
         highestEducation: data.highestEducation,
         maritalStatus: data.maritalStatus,
-        householdSize: data.householdSize,
+        householdSize: data.householdSize ? Number(data.householdSize) : null,
         state: data.state,
         lga: data.lga,
         cluster: data.cluster,
         userGroup: data.userGroup,
         nameOfChosenEnterprise: data.nameOfChosenEnterprise,
         typeOfEnterprise: data.typeOfEnterprise,
-        estimatedAnnualIncome: data.estimatedAnnualIncome,
+        estimatedAnnualIncome: Number(data.estimatedAnnualIncome) || 0,
         phoneNumber: data.phoneNumber,
         photoUrl: data.photoUrl,
+        createdById: agentId, // 👈 Explicit link to User.id UUID
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            fullName: true,
+            uniqueAdminId: true,
+            email: true,
+            designation: true,
+            lga: true,
+            state: true,
+          },
+        },
       },
     });
 
@@ -118,25 +202,32 @@ export async function createFarmerRecord(data: CreateFarmerInput) {
   }
 }
 
-/**
- * 3. Server Action to Fetch All Farmer Records
- */
 export async function getFarmerRecords() {
   try {
     const records = await prisma.farmer.findMany({
       orderBy: { createdAt: "desc" },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            fullName: true,
+            uniqueAdminId: true,
+            email: true,
+            designation: true,
+            lga: true,
+            state: true,
+          },
+        },
+      },
     });
 
     return { success: true, data: records };
   } catch (error: any) {
     console.error("Error fetching farmer records:", error);
-    return { success: false, error: error.message || "Failed to fetch records" };
+    return { success: false, data: [], error: error.message || "Failed to fetch records" };
   }
 }
 
-/**
- * 4. Server Action to Verify User Unique Admin ID & Security PIN
- */
 export async function verifyFarmerUniqueId(uniqueId: string, pin: string) {
   try {
     const trimmedId = uniqueId ? uniqueId.trim() : "";
@@ -174,30 +265,47 @@ export async function verifyFarmerUniqueId(uniqueId: string, pin: string) {
       };
     }
 
+    const { userId: clerkUserId } = await auth();
+    if (clerkUserId && user.clerkUserId !== clerkUserId) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { clerkUserId },
+      });
+    }
+
     const cookieStore = await cookies();
-    cookieStore.set("agri_session_id", user.id, {
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "lax" as const,
       path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 Days
-    });
+      maxAge: 60 * 60 * 24 * 7,
+    };
 
-    return { success: true };
+    cookieStore.set(
+      "agri_session_verified",
+      user.uniqueAdminId || user.id,
+      cookieOptions
+    );
+    cookieStore.set("agri_session_id", user.id, cookieOptions);
+
   } catch (error: any) {
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) {
+      throw error;
+    }
     console.error("Verification error:", error);
     return {
       success: false,
       error: error.message || "Failed to verify Unique ID and PIN",
     };
   }
+
+  redirect("/dashboard");
 }
 
-/**
- * 5. Server Action to Log Out User and Clear Cookie
- */
 export async function logoutUser() {
   const cookieStore = await cookies();
-  cookieStore.delete("agri_session_id");
-  redirect("/");
+  cookieStore.delete({ name: "agri_session_verified", path: "/" });
+  cookieStore.delete({ name: "agri_session_id", path: "/" });
+  redirect("/login-agri");
 }

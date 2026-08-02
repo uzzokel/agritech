@@ -3,38 +3,68 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 const protectedPaths = ["/dashboard", "/features", "/blog"];
-const authPaths = ["/login-agri", "/register-agri"];
+const ADMIN_EMAIL = "uzzokel@gmail.com";
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId } = await auth();
-  const { pathname } = req.nextUrl;
-  
-  // Use the exact cookie name set by loginAgriUser
-  const agriSession = req.cookies.get("agri_session_verified");
+  // 🛡️ BYPASS: Let Next.js Server Actions pass through instantly without redirection traps
+  if (req.method === "POST" && req.headers.get("next-action")) {
+    return NextResponse.next();
+  }
+
+  const { userId, sessionClaims } = await auth();
+  const { pathname, searchParams } = req.nextUrl;
+
+  // 1. Always attach x-pathname to request headers for protectAgriRoute()
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-pathname", pathname);
 
   const isProtectedAgriRoute = protectedPaths.some((path) =>
     pathname.startsWith(path)
   );
-  const isAgriAuthRoute = authPaths.some((path) =>
-    pathname.startsWith(path)
-  );
 
-  // CHECK 1: Protect /dashboard, /features, /blog
-  if (isProtectedAgriRoute) {
-    if (!userId) {
-      console.log(`🔒 Clerk user missing! Redirecting ${pathname} to /sign-in`);
-      const signInUrl = new URL("/sign-in", req.url);
-      signInUrl.searchParams.set("redirect_url", req.url);
-      return NextResponse.redirect(signInUrl);
-    }
-    // Signed-in Clerk users proceed to page components where protectAgriRoute() checks Prisma!
+  // 2. Require Clerk login for protected routes -> Redirect to /unauthorized with return URL
+  if (isProtectedAgriRoute && !userId) {
+    console.log(`🔒 Clerk user missing! Redirecting ${pathname} to /unauthorized`);
+    const unauthorizedUrl = new URL("/unauthorized", req.url);
+    unauthorizedUrl.searchParams.set("redirect_url", pathname);
+    return NextResponse.redirect(unauthorizedUrl);
   }
 
-  // CHECK 2: Prevent users with an active AGRI PIN session from visiting auth pages
-  if (isAgriAuthRoute && agriSession && userId) {
-    console.log(`⚡ Active Clerk + AGRI session detected! Redirecting away from ${pathname} to /dashboard`);
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  // 3. ADMIN BYPASS: If authenticated via Clerk as admin, grant direct access
+  const userEmail =
+    (sessionClaims?.email as string) ||
+    (sessionClaims?.primaryEmail as string) ||
+    (sessionClaims?.email_address as string);
+
+  if (userId && userEmail === ADMIN_EMAIL) {
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
+
+  // 4. Clean up stale session if redirected with ?invalid=1
+  if (pathname.startsWith("/login-agri") && searchParams.get("invalid") === "1") {
+    console.log("🧹 Clearing stale AGRI cookie due to session mismatch.");
+    const response = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+    response.cookies.delete({
+      name: "agri_session_verified",
+      path: "/",
+    });
+    return response;
+  }
+
+  // Default: proceed with modified request headers
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 });
 
 export const config = {

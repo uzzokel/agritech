@@ -1,3 +1,4 @@
+// app/dashboard/FarmerRegistrationForm.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,7 +20,8 @@ interface FarmerFormProps {
 export default function FarmerRegistrationForm({ onSuccess, user }: FarmerFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submittedName, setSubmittedName] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const initialFormData = {
@@ -34,21 +36,20 @@ export default function FarmerRegistrationForm({ onSuccess, user }: FarmerFormPr
     cluster: "",
     userGroup: "",
     nameOfChosenEnterprise: "",
-    typeOfEnterprise: "Crop Production",
+    typeOfEnterprise: "Crop production",
     estimatedAnnualIncome: "",
     phoneNumber: "",
   };
 
   const [formData, setFormData] = useState(initialFormData);
 
+  // Sync state & lga when active user changes
   useEffect(() => {
-    if (user?.state || user?.lga) {
-      setFormData((prev) => ({
-        ...prev,
-        state: prev.state || user.state || "",
-        lga: prev.lga || user.lga || "",
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      state: user?.state || prev.state || "",
+      lga: user?.lga || prev.lga || "",
+    }));
   }, [user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -61,18 +62,21 @@ export default function FarmerRegistrationForm({ onSuccess, user }: FarmerFormPr
     }
   };
 
-  // Safe scroll helper to avoid shaking the outer dashboard viewport
-  const scrollToTop = (e: React.FormEvent) => {
-    const target = e.currentTarget as HTMLElement;
-    const parentContainer = target.closest("main") || window;
-    parentContainer.scrollTo({ top: 0, behavior: "smooth" });
+  const scrollToTop = () => {
+    if (typeof window !== "undefined") {
+      const mainElement = document.querySelector("main");
+      if (mainElement) {
+        mainElement.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       let photoUrl: string | null = null;
@@ -85,13 +89,14 @@ export default function FarmerRegistrationForm({ onSuccess, user }: FarmerFormPr
         if (!uploadRes.success) {
           setError(uploadRes.error || "Failed to upload photo");
           setLoading(false);
-          scrollToTop(e);
+          scrollToTop();
           return;
         }
         photoUrl = uploadRes.url || null;
       }
 
       const result = await createFarmerRecord({
+        createdById: user?.id, // Explicitly send the current user ID
         fullName: formData.fullName,
         age: parseInt(formData.age, 10),
         gender: formData.gender,
@@ -112,43 +117,67 @@ export default function FarmerRegistrationForm({ onSuccess, user }: FarmerFormPr
       });
 
       if (result.success) {
-        setSuccessMessage("🎉 Farmer registered successfully!");
+        setSubmittedName(formData.fullName);
         setFormData(initialFormData);
         setPhotoFile(null);
-        scrollToTop(e);
-
-        if (onSuccess) onSuccess();
+        setIsSubmitted(true);
+        scrollToTop();
       } else {
         setError(result.error || "Failed to create record");
-        scrollToTop(e);
+        scrollToTop();
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
-      scrollToTop(e);
+      scrollToTop();
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6 text-slate-100">
-      {/* Success Notification */}
-      {successMessage && (
-        <div className="p-4 bg-emerald-950/60 border border-emerald-500/50 rounded-xl text-emerald-300 text-sm flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span>✅</span>
-            <span>{successMessage}</span>
-          </div>
+  const handleResetForm = () => {
+    setIsSubmitted(false);
+    setSubmittedName("");
+  };
+
+  // SUCCESS SCREEN
+  if (isSubmitted) {
+    return (
+      <div className="p-8 bg-slate-900/90 border border-emerald-500/30 rounded-2xl text-center space-y-6 max-w-xl mx-auto my-4 shadow-xl">
+        <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full flex items-center justify-center mx-auto text-3xl">
+          ✓
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-white mb-2">Registration Successful!</h3>
+          <p className="text-slate-300 text-sm">
+            Farmer <span className="text-emerald-400 font-semibold">{submittedName}</span> has been successfully added to records.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
           <button
             type="button"
-            onClick={() => setSuccessMessage(null)}
-            className="text-xs text-emerald-400 hover:underline"
+            onClick={handleResetForm}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm rounded-xl transition-all"
           >
-            Dismiss
+            + Register Another Farmer
           </button>
+          
+          {onSuccess && (
+            <button
+              type="button"
+              onClick={onSuccess}
+              className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm rounded-xl border border-slate-700 transition-all"
+            >
+              Done / Close
+            </button>
+          )}
         </div>
-      )}
+      </div>
+    );
+  }
 
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 text-slate-100">
       {/* Error Notification */}
       {error && (
         <div className="p-4 bg-red-900/40 border border-red-500/50 rounded-xl text-red-300 text-sm flex items-center gap-2">
@@ -329,15 +358,19 @@ export default function FarmerRegistrationForm({ onSuccess, user }: FarmerFormPr
 
         <div>
           <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Type of Enterprise *</label>
-          <input
-            type="text"
+          <select
             name="typeOfEnterprise"
             required
             value={formData.typeOfEnterprise}
             onChange={handleChange}
-            placeholder="Crop Production"
-            className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-emerald-900/40 rounded-xl text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
+            className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-emerald-900/40 rounded-xl text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="Crop production">Crop production</option>
+            <option value="Processing">Processing</option>
+            <option value="Machinery">Machinery</option>
+            <option value="Livestock production">Livestock production</option>
+            <option value="Marketing">Marketing</option>
+          </select>
         </div>
 
         <div>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { registerAgriUser } from "@/app/actions/register-agri";
 
 const DESIGNATION_OPTIONS = [
@@ -14,19 +15,35 @@ const DESIGNATION_OPTIONS = [
 
 export default function RegisterAgriPage() {
   const router = useRouter();
+  const { isLoaded, user } = useUser();
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState({
     fullName: "",
-    email: "", // 👈 1. Added email state
+    email: "",
     state: "",
     lga: "",
     designation: "",
     phoneNumber: "",
     securityPin: "",
   });
+
+  // Auto-fill user email and name once Clerk loads
+  useEffect(() => {
+    if (isLoaded && user) {
+      const primaryEmail = user.primaryEmailAddress?.emailAddress || "";
+      const fullName = user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim();
+
+      setForm((prev) => ({
+        ...prev,
+        email: prev.email || primaryEmail,
+        fullName: prev.fullName || fullName,
+      }));
+    }
+  }, [isLoaded, user]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -60,12 +77,20 @@ export default function RegisterAgriPage() {
     const res = await registerAgriUser(form);
     setLoading(false);
 
-    if (res.success) {
+    if (res?.success) {
       setSubmitted(true);
     } else {
-      setError(res.error || "An error occurred.");
+      setError(res?.error || "An error occurred.");
     }
   };
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
+        Loading authorization check...
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -76,7 +101,9 @@ export default function RegisterAgriPage() {
           </div>
           <h2 className="text-2xl font-bold mb-2">Application Submitted!</h2>
           <p className="text-gray-400 text-sm mb-6">
-            Your details have been registered. Your account status is currently <span className="text-amber-400 font-semibold">PENDING</span>. Once an admin reviews and approves your account, your access credentials will be delivered.
+            Your details have been registered. Your account status is currently{" "}
+            <span className="text-amber-400 font-semibold">PENDING</span>. Once an
+            admin reviews and approves your account, your access credentials will be delivered.
           </p>
           <button
             onClick={() => router.push("/")}
@@ -117,7 +144,6 @@ export default function RegisterAgriPage() {
             />
           </div>
 
-          {/* 👈 2. Added Email Address Input */}
           <div>
             <label className="block text-xs font-semibold text-gray-300 mb-1">Email Address *</label>
             <input
@@ -213,7 +239,7 @@ export default function RegisterAgriPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition duration-200"
+            className="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition duration-200 disabled:opacity-50"
           >
             {loading ? "Submitting Application..." : "Submit Registration"}
           </button>

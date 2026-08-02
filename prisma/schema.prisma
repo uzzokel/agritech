@@ -20,8 +20,8 @@ enum Status {
 model User {
   id            String   @id @default(uuid())
   clerkUserId   String?  @unique
-  uniqueAdminId String?  @unique 
-  securityPin   String   
+  uniqueAdminId String?  @unique
+  securityPin   String
   fullName      String
   email         String   @unique
   designation   String
@@ -29,17 +29,23 @@ model User {
   state         String
   phoneNumber   String?
   role          Role     @default(USER)
-  status        Status   @default(PENDING) 
-  emailSent     Boolean  @default(false)   
+  status        Status   @default(PENDING)
+  emailSent     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  // Linked farmer records registered by this user/agent
+  farmers Farmer[]
+
+  // Comments made by this user on admin report summaries
+  adminComments AdminReportComment[]
 }
 
 // ==========================================
 // Farmer Registration Model
 // ==========================================
 model Farmer {
-  id                     String   @id @default(uuid())
+  id                     String  @id @default(uuid())
   fullName               String
   age                    Int
   gender                 String
@@ -55,6 +61,49 @@ model Farmer {
   estimatedAnnualIncome  Float
   phoneNumber            String
   photoUrl               String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+
+  // Relation back to the User/Agent who created this record (REQUIRED)
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserReport {
+  id         String   @id @default(uuid())
+  authorName String
+  role       String
+  state      String
+  fileName   String
+  fileUrl    String
+  createdAt  DateTime @default(now())
+}
+
+model AdminReportSummary {
+  id              String   @id @default(uuid())
+  execSummary     String   @db.Text
+  keyMetrics      String   @db.Text
+  recommendations String   @db.Text
+  fileName        String
+  fileUrl         String
+  createdAt       DateTime @default(now())
+
+  // Opposite relation field for comments
+  comments AdminReportComment[]
+}
+
+model AdminReportComment {
+  id        String             @id @default(uuid())
+  summaryId String
+  summary   AdminReportSummary @relation(fields: [summaryId], references: [id], onDelete: Cascade)
+
+  // Link the comment directly to the User model instead of relying on loose strings
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  authorName String
+  authorRole String
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
 }

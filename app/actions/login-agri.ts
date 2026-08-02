@@ -1,50 +1,41 @@
-// app/actions/login-agri.ts
 "use server";
 
 import { cookies } from "next/headers";
-import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
 export async function loginAgriUser(prevState: any, formData: FormData) {
-  const uniqueAdminId = (formData.get("uniqueAdminId") as string)?.trim().toUpperCase();
-  const securityPin = (formData.get("securityPin") as string)?.trim();
+  const uniqueAdminId = formData.get("uniqueAdminId") as string;
+  const securityPin = formData.get("securityPin") as string;
+  
+  // 🎯 Read requested destination from form input
+  const targetRedirect = (formData.get("redirectTo") as string) || "/dashboard";
 
   if (!uniqueAdminId || !securityPin) {
-    return { success: false, error: "AGRI-ID and PIN are required." };
+    return { success: false, error: "Please enter both AGRI-ID and Security PIN." };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { uniqueAdminId },
+  // 1. Find user by ID and PIN
+  const dbUser = await prisma.user.findFirst({
+    where: {
+      uniqueAdminId: uniqueAdminId.trim().toUpperCase(),
+      securityPin: securityPin.trim(),
+    },
   });
 
-  if (!user || !user.uniqueAdminId) {
+  if (!dbUser) {
     return { success: false, error: "Invalid AGRI-ID or Security PIN." };
   }
 
-  if (user.status !== "APPROVED") {
-    return { success: false, error: "Your account is pending admin approval." };
-  }
-
-  if (user.securityPin !== securityPin) {
-    return { success: false, error: "Invalid AGRI-ID or Security PIN." };
-  }
-
-  const { userId: clerkUserId } = await auth();
-  if (clerkUserId && !user.clerkUserId) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { clerkUserId },
-    });
-  }
-
+  // 2. Set the session cookie
   const cookieStore = await cookies();
-  cookieStore.set("agri_session_verified", user.uniqueAdminId, {
+  cookieStore.set("agri_session_verified", dbUser.id, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 8, // 8 hours
   });
 
-  return { success: true, error: null };
+  // 3. Dynamic Server Redirect to requested path
+  redirect(targetRedirect);
 }
