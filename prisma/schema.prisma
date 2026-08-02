@@ -98,9 +98,9 @@ model AdminReportComment {
   summaryId String
   summary   AdminReportSummary @relation(fields: [summaryId], references: [id], onDelete: Cascade)
 
-  // Link the comment directly to the User model instead of relying on loose strings
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Make userId optional so comments can be posted safely even if user reference is missing/omitted
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   authorName String
   authorRole String

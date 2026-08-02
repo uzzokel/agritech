@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import { useUser } from "@clerk/nextjs";
 import { theme } from "@/app/components/Styles";
 import { 
   uploadUserReportAction, 
@@ -47,9 +48,14 @@ const OFFICER_ROLES = [
   "Field Data Collector",
 ] as const;
 
+const ADMIN_EMAIL = "uzzokel@gmail.com";
+
 export default function ReportsPage() {
+  const { user } = useUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress || "";
+  const isAdmin = userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
   const [activeTab, setActiveTab] = useState<"powerbi" | "summary" | "upload">("powerbi");
-  const [currentUserRole, setCurrentUserRole] = useState<"admin" | "user">("admin");
   const [isPending, startTransition] = useTransition();
 
   const [hasSubmittedSummary, setHasSubmittedSummary] = useState(false);
@@ -60,10 +66,10 @@ export default function ReportsPage() {
   const [adminReportMeta, setAdminReportMeta] = useState<AdminSummaryData | null>(null);
 
   const [newCommentContent, setNewCommentContent] = useState("");
-  const [commentAuthorName, setCommentAuthorName] = useState(currentUserRole === "admin" ? "Admin Lead" : "Dr. Jane Smith");
+  const commentAuthorName = isAdmin ? "Admin Lead" : (user?.fullName || "Field Officer");
 
   const [selectedRole, setSelectedRole] = useState<typeof OFFICER_ROLES[number]>("Agricultural Officer");
-  const [customName, setCustomName] = useState("Dr. Jane Smith");
+  const [customName, setCustomName] = useState(user?.fullName || "Dr. Jane Smith");
   const [customState, setCustomState] = useState("Lagos State");
   const [userFile, setUserFile] = useState<File | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -74,6 +80,13 @@ export default function ReportsPage() {
     loadReports();
     loadAdminSummary();
   }, []);
+
+  // Update names dynamically if Clerk user loads later
+  useEffect(() => {
+    if (user?.fullName) {
+      if (!isAdmin) setCustomName(user.fullName);
+    }
+  }, [user, isAdmin]);
 
   const loadReports = async () => {
     const res = await fetchUserReportsAction();
@@ -107,7 +120,7 @@ export default function ReportsPage() {
 
   const handleSummarySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentUserRole !== "admin") {
+    if (!isAdmin) {
       alert("Permission denied. Only administrators can publish master reports.");
       return;
     }
@@ -127,7 +140,7 @@ export default function ReportsPage() {
     if (adminReportFile) formData.append("file", adminReportFile);
 
     startTransition(async () => {
-      const result = await uploadAdminReportAction(formData, currentUserRole);
+      const result = await uploadAdminReportAction(formData, isAdmin ? "admin" : "user");
       if (result.success && result.data) {
         setAdminReportMeta(result.data);
         setHasSubmittedSummary(true);
@@ -146,7 +159,7 @@ export default function ReportsPage() {
       const res = await createAdminReportCommentAction({
         summaryId: adminReportMeta.id,
         authorName: commentAuthorName,
-        authorRole: currentUserRole === "admin" ? "Administrator" : "Field Officer",
+        authorRole: isAdmin ? "Administrator" : "Field Officer",
         content: newCommentContent,
       });
 
@@ -189,26 +202,19 @@ export default function ReportsPage() {
     <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 text-slate-100" style={{ backgroundColor: theme.primaryColor }}>
       <div className="max-w-7xl mx-auto">
         
-        {/* Page Header & Role Switcher */}
+        {/* Page Header & Security Status Badge */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
           <div>
             <h1 className="text-3xl font-bold text-white">Analytics & Reports Hub</h1>
             <p className="text-slate-300 mt-1">Access analytics, oversee administrative progress logs, and coordinate field uploads.</p>
           </div>
           
-          <div className="flex items-center gap-3 bg-slate-800 p-2 rounded-xl border border-slate-700">
-            <span className="text-xs font-medium text-slate-400 pl-2">Session Role:</span>
-            <button
-              onClick={() => {
-                const nextRole = currentUserRole === "admin" ? "user" : "admin";
-                setCurrentUserRole(nextRole);
-                setCommentAuthorName(nextRole === "admin" ? "Admin Lead" : "Dr. Jane Smith");
-              }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all shadow"
-              style={{ backgroundColor: theme.secondaryColor }}
-            >
-              Switch to {currentUserRole === "admin" ? "Field Officer (User)" : "Admin"}
-            </button>
+          <div className="flex items-center gap-3 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+            <span className="text-xs font-medium text-slate-400">Signed in as:</span>
+            <span className="text-xs font-bold text-emerald-400">{userEmail || "Loading..."}</span>
+            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${isAdmin ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-blue-500/20 text-blue-300 border border-blue-500/30"}`}>
+              {isAdmin ? "Admin" : "Field User"}
+            </span>
           </div>
         </div>
 
@@ -277,6 +283,7 @@ export default function ReportsPage() {
                       <p className="text-sm text-slate-500">Review aggregated intelligence and master documents.</p>
                     </div>
 
+                    {/* Both Admin and Users can download the master report summary */}
                     <button
                       onClick={() => handleDownload(adminReportMeta?.fileUrl || "#", adminReportMeta?.fileName || "Master_Aggregated_Summary.pdf")}
                       disabled={!adminReportMeta?.fileUrl}
@@ -288,7 +295,7 @@ export default function ReportsPage() {
                   </div>
 
                   {/* ONLY ADMIN CAN VIEW/EDIT THE UPLOAD FORM */}
-                  {currentUserRole === "admin" && !hasSubmittedSummary ? (
+                  {isAdmin && !hasSubmittedSummary ? (
                     <form onSubmit={handleSummarySubmit} className="space-y-6">
                       <div className="p-6 rounded-xl border border-slate-700 shadow-inner space-y-4 text-white" style={{ backgroundColor: "#1e293b" }}>
                         <h3 className="font-semibold text-base text-emerald-400 flex items-center gap-2">
@@ -330,14 +337,14 @@ export default function ReportsPage() {
                     </form>
                   ) : (
                     <div className="space-y-6 text-slate-700">
-                      {currentUserRole === "admin" && (
+                      {isAdmin && (
                         <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-medium flex items-center justify-between">
                           <span>✅ Admin master overview published successfully.</span>
                           <button onClick={() => setHasSubmittedSummary(false)} className="text-xs underline text-emerald-900 font-semibold">Edit Overview</button>
                         </div>
                       )}
 
-                      {currentUserRole === "user" && !hasSubmittedSummary && (
+                      {!isAdmin && !hasSubmittedSummary && (
                         <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-sm font-medium">
                           <span>ℹ️ Awaiting administrative master summary publication.</span>
                         </div>
@@ -512,31 +519,39 @@ export default function ReportsPage() {
                                 <td className="p-3 font-medium text-slate-800">{rep.authorName}</td>
                                 <td className="p-3">{rep.role}</td>
                                 <td className="p-3">{rep.state}</td>
-                                <td className="p-3 text-emerald-600 underline truncate max-w-[150px]">
-                                  <button onClick={() => handleDownload(rep.fileUrl, rep.fileName)}>{rep.fileName}</button>
+                                <td className="p-3 text-emerald-600 truncate max-w-[150px]">
+                                  {isAdmin ? (
+                                    <button onClick={() => handleDownload(rep.fileUrl, rep.fileName)} className="underline">{rep.fileName}</button>
+                                  ) : (
+                                    <span>{rep.fileName}</span>
+                                  )}
                                 </td>
                                 <td className="p-3">{new Date(rep.createdAt).toLocaleDateString()}</td>
                                 <td className="p-3 text-right space-x-2">
-                                  <button
-                                    onClick={() => handleDownload(rep.fileUrl, rep.fileName)}
-                                    className="text-xs px-2.5 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium"
-                                  >
-                                    Download
-                                  </button>
-                                  {/* DELETE BUTTON IS NOW HIDDEN FOR REGULAR USERS */}
-                                  {currentUserRole === "admin" && (
-                                    <button
-                                      onClick={async () => {
-                                        if (confirm("Are you sure you want to delete this report?")) {
-                                          const res = await deleteUserReportAction(rep.id, currentUserRole);
-                                          if (res.success) loadReports();
-                                          else alert(`Error: ${res.error}`);
-                                        }
-                                      }}
-                                      className="text-xs px-2.5 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 font-medium"
-                                    >
-                                      Delete
-                                    </button>
+                                  {/* ONLY ADMIN CAN VIEW DOWNLOAD & DELETE BUTTONS */}
+                                  {isAdmin ? (
+                                    <>
+                                      <button
+                                        onClick={() => handleDownload(rep.fileUrl, rep.fileName)}
+                                        className="text-xs px-2.5 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium"
+                                      >
+                                        Download
+                                      </button>
+                                      <button
+                                        onClick={async () => {
+                                          if (confirm("Are you sure you want to delete this report?")) {
+                                            const res = await deleteUserReportAction(rep.id, "admin");
+                                            if (res.success) loadReports();
+                                            else alert(`Error: ${res.error}`);
+                                          }
+                                        }}
+                                        className="text-xs px-2.5 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 font-medium"
+                                      >
+                                        Delete
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-slate-400 italic">Restricted</span>
                                   )}
                                 </td>
                               </tr>
