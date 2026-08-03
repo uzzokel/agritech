@@ -27,13 +27,23 @@ export async function loginAgriUser(prevState: any, formData: FormData) {
     return { success: false, error: "Invalid AGRI-ID or Security PIN." };
   }
 
-  // 2. Set the session cookie
+  // 2. Set the session cookies
   const cookieStore = await cookies();
-  cookieStore.set("agri_session_verified", dbUser.id, {
+  
+  cookieStore.set("agri_session_verified", "true", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+
+  cookieStore.set("agri_session_id", dbUser.id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
   });
 
   // 3. Dynamic Server Redirect to requested path

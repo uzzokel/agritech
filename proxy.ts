@@ -2,7 +2,7 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const protectedPaths = ["/dashboard", "/features", "/blog"];
+const protectedPaths = ["/dashboard", "/dashboard/reports", "/features", "/blog"];
 const ADMIN_EMAIL = "uzzokel@gmail.com";
 
 export default clerkMiddleware(async (auth, req) => {
@@ -14,7 +14,6 @@ export default clerkMiddleware(async (auth, req) => {
   const { userId, sessionClaims } = await auth();
   const { pathname, searchParams } = req.nextUrl;
 
-  // 1. Always attach x-pathname to request headers for protectAgriRoute()
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-pathname", pathname);
 
@@ -22,7 +21,7 @@ export default clerkMiddleware(async (auth, req) => {
     pathname.startsWith(path)
   );
 
-  // 2. Require Clerk login for protected routes -> Redirect to /unauthorized with return URL
+  // 1. Require Clerk login for protected routes -> Redirect to /unauthorized with return URL
   if (isProtectedAgriRoute && !userId) {
     console.log(`🔒 Clerk user missing! Redirecting ${pathname} to /unauthorized`);
     const unauthorizedUrl = new URL("/unauthorized", req.url);
@@ -30,7 +29,7 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(unauthorizedUrl);
   }
 
-  // 3. ADMIN BYPASS: If authenticated via Clerk as admin, grant direct access
+  // 2. ADMIN BYPASS: If authenticated via Clerk as admin, grant direct access
   const userEmail =
     (sessionClaims?.email as string) ||
     (sessionClaims?.primaryEmail as string) ||
@@ -42,6 +41,16 @@ export default clerkMiddleware(async (auth, req) => {
         headers: requestHeaders,
       },
     });
+  }
+
+  // 3. PREVENT LOGIN LOOP: If user is already verified and hits /login-agri, send them to dashboard
+  if (pathname.startsWith("/login-agri") && userId) {
+    const agriVerified = req.cookies.get("agri_session_verified")?.value;
+    const agriSessionId = req.cookies.get("agri_session_id")?.value;
+
+    if (agriVerified === "true" && agriSessionId) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
   }
 
   // 4. Clean up stale session if redirected with ?invalid=1
