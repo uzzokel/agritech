@@ -30,11 +30,12 @@ export default async function DashboardLayout({
     );
   }
 
-  // 🔒 2. REGULAR USER CHECKS
+  // 🔒 2. REGULAR USER CHECKS (Tier-2 Route Control)
   const cookieStore = await cookies();
   const agriVerified = cookieStore.get("agri_session_verified")?.value;
   const agriSessionId = cookieStore.get("agri_session_id")?.value;
 
+  // If Tier-2 cookies are missing, inspect Postgres status
   if (agriVerified !== "true" || !agriSessionId) {
     const email = clerkUser?.emailAddresses?.[0]?.emailAddress;
 
@@ -48,16 +49,24 @@ export default async function DashboardLayout({
       select: { id: true, status: true }
     });
 
+    // 🔴 1. NEW USER: No database profile exists yet -> Must register first
     if (!dbUser) {
       redirect("/register-agri");
     }
 
+    // 🟡 2. PENDING USER: Registered, but awaiting admin approval
     if (dbUser.status === "PENDING") {
       redirect("/register-agri?pending=1");
     }
 
+    // 🟢 3. APPROVED USER: Has AGRI-ID & PIN, but needs to authenticate via /login-agri
     if (dbUser.status === "APPROVED") {
       redirect("/login-agri?redirectTo=/dashboard");
+    }
+
+    // ⛔ 4. DENIED USER: Access explicitly denied
+    if (dbUser.status === "DENIED") {
+      redirect("/register-agri?denied=1");
     }
   }
 

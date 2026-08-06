@@ -6,10 +6,14 @@ import { prisma } from "@/lib/prisma";
 
 const ADMIN_EMAILS = ["uzzokel@gmail.com"];
 
-export async function protectAgriRoute() {
+export async function protectAgriRoute(fallbackPath?: string) {
   // Get current pathname from incoming headers for seamless redirect targeting
   const headersList = await headers();
-  const currentPath = headersList.get("x-pathname") || headersList.get("next-url") || "/dashboard";
+  const currentPath =
+    fallbackPath ||
+    headersList.get("x-pathname") ||
+    headersList.get("next-url") ||
+    "/dashboard";
 
   // 1. Clerk Authentication Check
   const { userId } = await auth();
@@ -28,7 +32,7 @@ export async function protectAgriRoute() {
 
     // Admins bypass registration, approval status, and PIN checks completely
     return {
-      id: clerkUser?.id || userId,
+      id: "AGRI-ADMIN-001",
       clerkUserId: userId,
       email: userEmail,
       fullName,
@@ -62,9 +66,15 @@ export async function protectAgriRoute() {
 
   // 6. User IS APPROVED -> Check active Security PIN session (Regular users only)
   const cookieStore = await cookies();
-  const agriSession = cookieStore.get("agri_session_verified")?.value;
+  const agriVerified = cookieStore.get("agri_session_verified")?.value;
+  const agriSessionId = cookieStore.get("agri_session_id")?.value;
 
-  if (!agriSession || agriSession !== dbUser.id) {
+  // ✅ FIX: Check that the session is verified AND matches dbUser.id OR dbUser.uniqueAdminId
+  const isValidSession =
+    agriVerified === "true" &&
+    (agriSessionId === dbUser.id || agriSessionId === dbUser.uniqueAdminId);
+
+  if (!isValidSession) {
     // Pass the destination target back to /login-agri
     redirect(`/login-agri?redirect=${encodeURIComponent(currentPath)}`);
   }

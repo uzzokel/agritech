@@ -3,6 +3,18 @@ import { clerkMiddleware, createRouteMatcher, createClerkClient } from "@clerk/n
 import { NextResponse } from "next/server";
 import { ADMIN_EMAILS } from "@/lib/admin";
 
+// 🛠️ 1. Extend Clerk's SessionClaims interface for custom JWT claims
+declare global {
+  interface CustomSessionClaims {
+    email?: string;
+    primaryEmail?: string;
+    email_address?: string;
+    metadata?: {
+      role?: string;
+    };
+  }
+}
+
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
   "/features(.*)",
@@ -18,14 +30,26 @@ export default clerkMiddleware(async (auth, req) => {
   const { userId, sessionClaims } = await auth();
   const { pathname, searchParams } = req.nextUrl;
 
+  // Safely cast claims to CustomSessionClaims
+  const claims = sessionClaims as unknown as CustomSessionClaims;
+
+  // Preserve existing request headers while forwarding x-pathname
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-pathname", pathname);
 
+  // Helper for passthrough response carrying x-pathname header
+  const nextWithHeaders = () =>
+    NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+
   // 1. EXTRACT USER EMAIL FROM CLAIMS
-  let userEmail = (
-    (sessionClaims?.email as string) ||
-    (sessionClaims?.primaryEmail as string) ||
-    (sessionClaims?.email_address as string)
+  let userEmail: string | undefined = (
+    claims?.email ||
+    claims?.primaryEmail ||
+    claims?.email_address
   )?.toLowerCase();
 
   // 🚨 FAIL-SAFE: If Clerk userId exists but email claim is missing, fetch email via Clerk Client
@@ -33,7 +57,7 @@ export default clerkMiddleware(async (auth, req) => {
     try {
       const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
       const user = await clerk.users.getUser(userId);
-      userEmail = user.primaryEmailAddress?.emailAddress?.toLowerCase();
+      userEmail = user.primaryEmailAddress?.emailAddress?.toLowerCase() ?? undefined;
     } catch (err) {
       console.error("Failed to fetch Clerk user email in middleware:", err);
     }
@@ -44,22 +68,20 @@ export default clerkMiddleware(async (auth, req) => {
     Boolean(userId) &&
     (
       (userEmail ? ADMIN_EMAILS.includes(userEmail) : false) ||
-      sessionClaims?.metadata?.role === "admin"
+      claims?.metadata?.role === "admin"
     );
 
   if (isAdmin) {
-    // Prevent Admins from ever visiting login or registration pages
     if (pathname.startsWith("/login-agri") || pathname.startsWith("/register-agri")) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+      const redirectTo = searchParams.get("redirect") || "/dashboard";
+      return NextResponse.redirect(new URL(redirectTo, req.url));
     }
 
-    console.log(`⚡ [ADMIN BYPASS] Auto-minting AGRI-ADMIN-001 session for ${userEmail} at ${pathname}`);
+    console.log(`⚡ [ADMIN BYPASS] Auto-minting AGRI-ADMIN-001 session for ${userEmail ?? "Admin"} at ${pathname}`);
 
-    const response = NextResponse.next({
-      request: { headers: requestHeaders },
-    });
+    const response = nextWithHeaders();
 
-    // 🔑 Auto-set cookies so client components recognize admin session as AGRI-ADMIN-001
+    // 🔑 Set cookies on response directly
     response.cookies.set("agri_session_verified", "true", { path: "/", httpOnly: false });
     response.cookies.set("agri_session_id", "AGRI-ADMIN-001", { path: "/", httpOnly: false });
 
@@ -73,16 +95,13 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(unauthorizedUrl);
   }
 
-  // 4. AGRI TIER-2 CHECK for regular non-admin users
+  // 4. DELEGATE TIER-2 ROUTING FOR REGULAR USERS
   if (isProtectedRoute(req)) {
     const agriVerified = req.cookies.get("agri_session_verified")?.value;
     const agriSessionId = req.cookies.get("agri_session_id")?.value;
 
     if (agriVerified !== "true" || !agriSessionId) {
-      console.log(`🔒 [REGULAR USER] Missing Agri Session. Redirecting ${pathname} to /login-agri`);
-      const loginUrl = new URL("/login-agri", req.url);
-      loginUrl.searchParams.set("redirectTo", pathname);
-      return NextResponse.redirect(loginUrl);
+      console.log(`🔒 [REGULAR USER] Missing Tier-2 session for ${pathname}. Delegating routing to layout.tsx...`);
     }
   }
 
@@ -95,7 +114,9 @@ export default clerkMiddleware(async (auth, req) => {
     const agriSessionId = req.cookies.get("agri_session_id")?.value;
 
     if (agriVerified === "true" && agriSessionId) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+      // Respect 'redirect' param if user was heading somewhere specific (e.g. /features)
+      const targetDestination = searchParams.get("redirect") || "/dashboard";
+      return NextResponse.redirect(new URL(targetDestination, req.url));
     }
   }
 
@@ -104,17 +125,14 @@ export default clerkMiddleware(async (auth, req) => {
     (pathname.startsWith("/login-agri") || pathname.startsWith("/register-agri")) &&
     searchParams.get("invalid") === "1"
   ) {
-    const response = NextResponse.next({
-      request: { headers: requestHeaders },
-    });
+    const response = nextWithHeaders();
     response.cookies.delete({ name: "agri_session_verified", path: "/" });
     response.cookies.delete({ name: "agri_session_id", path: "/" });
     return response;
   }
 
-  return NextResponse.next({
-    request: { headers: requestHeaders },
-  });
+  // Standard passthrough with custom headers attached
+  return nextWithHeaders();
 });
 
 export const config = {

@@ -4,8 +4,8 @@ import { Sparkles, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default async function FeaturesPage() {
-  // 🔒 Enforces Clerk auth + DB registration + approval status + PIN session
-  const dbUser = await protectAgriRoute();
+  // 🔒 Pass "/features" so protection failure redirects to /login-agri?redirect=/features
+  const dbUser = await protectAgriRoute("/features");
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
