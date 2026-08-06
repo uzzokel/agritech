@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,11 +12,41 @@ const supabase = createClient(
 );
 
 // ==========================================
+// AUTHENTICATION HELPER
+// ==========================================
+
+async function verifyAgriSessionOrThrow() {
+  const cookieStore = await cookies();
+  const agriVerified = cookieStore.get("agri_session_verified")?.value;
+  const agriSessionId = cookieStore.get("agri_session_id")?.value;
+
+  if (agriVerified === "true" && agriSessionId) {
+    return; // Valid session cookies found
+  }
+
+  // Fallback check: Is user an admin via Clerk?
+  const { userId, sessionClaims } = await auth();
+  const ADMIN_EMAIL = "uzzokel@gmail.com";
+  const userEmail =
+    (sessionClaims?.email as string) ||
+    (sessionClaims?.primaryEmail as string) ||
+    (sessionClaims?.email_address as string);
+
+  if (userId && userEmail === ADMIN_EMAIL) {
+    return; // Admin bypass allowed
+  }
+
+  throw new Error("Unauthorized: Missing valid agricultural ID and PIN session.");
+}
+
+// ==========================================
 // USER REPORT ACTIONS
 // ==========================================
 
 export async function uploadUserReportAction(formData: FormData) {
   try {
+    await verifyAgriSessionOrThrow();
+
     const authorName = formData.get("authorName") as string;
     const role = formData.get("role") as string;
     const state = formData.get("state") as string;
@@ -55,6 +87,8 @@ export async function uploadUserReportAction(formData: FormData) {
 
 export async function fetchUserReportsAction() {
   try {
+    await verifyAgriSessionOrThrow();
+
     const reports = await prisma.userReport.findMany({
       orderBy: { createdAt: "desc" },
     });
@@ -66,6 +100,8 @@ export async function fetchUserReportsAction() {
 
 export async function deleteUserReportAction(id: string, userRole: string) {
   try {
+    await verifyAgriSessionOrThrow();
+
     if (userRole !== "admin") {
       return { success: false, error: "Unauthorized: Only administrators can delete reports." };
     }
@@ -94,6 +130,8 @@ export async function deleteUserReportAction(id: string, userRole: string) {
 
 export async function uploadAdminReportAction(formData: FormData, userRole: string) {
   try {
+    await verifyAgriSessionOrThrow();
+
     if (userRole !== "admin") {
       return { success: false, error: "Unauthorized: Only administrators can publish master reports." };
     }
@@ -160,6 +198,8 @@ export async function uploadAdminReportAction(formData: FormData, userRole: stri
 
 export async function fetchAdminReportAction() {
   try {
+    await verifyAgriSessionOrThrow();
+
     const summary = await prisma.adminReportSummary.findFirst({
       orderBy: { createdAt: "desc" },
       include: {
@@ -186,6 +226,8 @@ export async function createAdminReportCommentAction(data: {
   userId?: string | null;
 }) {
   try {
+    await verifyAgriSessionOrThrow();
+
     if (!data.summaryId || !data.content) {
       return { success: false, error: "Missing required comment fields." };
     }

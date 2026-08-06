@@ -1,18 +1,30 @@
 // lib/admin.ts
 
-export const ADMIN_EMAILS = [
-  "uzzokel@gmail.com",
-  // Add future admin emails here
-];
+const HARDCODED_ADMINS = ["uzzokel@gmail.com"];
 
+const ENV_ADMINS = (process.env.ADMIN_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+export const ADMIN_EMAILS = Array.from(
+  new Set([...HARDCODED_ADMINS, ...ENV_ADMINS])
+);
+
+/**
+ * Pure check function — completely safe for Client Components & Middleware
+ */
 export function isAdminUser(user: any): boolean {
   if (!user) return false;
 
-  const email =
+  const email = (
     user?.email ||
     user?.emailAddress ||
     user?.primaryEmailAddress?.emailAddress ||
-    user?.sessionClaims?.email;
+    user?.sessionClaims?.email
+  )
+    ?.toLowerCase()
+    ?.trim();
 
-  return Boolean(email && ADMIN_EMAILS.includes(email.toLowerCase().trim()));
+  return Boolean(email && ADMIN_EMAILS.includes(email));
 }
