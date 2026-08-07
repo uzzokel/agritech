@@ -257,7 +257,7 @@ export default function ReportsPage() {
 
           {/* Main Content View */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-xl shadow-md p-6 sm:p-8 border border-slate-200 min-h-[550px] text-slate-800">
+            <div className="bg-white rounded-xl shadow-md p-6 sm:p-8 border border-slate-200 min-h-[800px] text-slate-800">
               
               {/* Tab 1: PowerBI Dashboard */}
               {activeTab === "powerbi" && (
@@ -268,8 +268,9 @@ export default function ReportsPage() {
                       <p className="text-sm text-slate-500">Live data insights synced directly from your data warehouse.</p>
                     </div>
                   </div>
-                  <div className="w-full h-[500px] bg-slate-900 rounded-lg overflow-hidden flex flex-col items-center justify-center relative border border-slate-800">
-                    <iframe title="PowerBI Dashboard" className="w-full h-full border-0" src="https://app.powerbi.com/view?r=YOUR_POWER_BI_EMBED_URL_HERE" allowFullScreen={true}></iframe>
+                  {/* Expanded height to h-[750px] or h-[calc(100vh-280px)] */}
+                  <div className="w-full h-[550px] bg-slate-900 rounded-lg overflow-hidden flex flex-col items-center justify-center relative border border-slate-800 shadow-inner">
+                    <iframe title="PowerBI Dashboard" className="w-200 h-350 border-0" src="https://app.powerbi.com/reportEmbed?reportId=32ab744b-dec3-4598-8eba-1fc26f298fb6&autoAuth=true&ctid=6d6a2580-7139-4209-acaa-0b5b7c8398a5&actionBarEnabled=true" allowFullScreen={true}></iframe>
                   </div>
                 </div>
               )}
