@@ -1,16 +1,16 @@
 // app/dashboard/page.tsx
-import React from "react";
+import { redirect } from "next/navigation";
 import { protectAgriRoute } from "@/lib/protect-route";
 import { getFarmerRecords } from "./actions";
 import DashboardClientView from "./DashboardClientView";
-import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
   const dbUser = await protectAgriRoute();
 
-  // Redirect if no authenticated user session is found
+  // If protectAgriRoute returns null, redirect to /register-agri instead of /sign-in
+  // to stay aligned with your middleware's Tier-2 verification flow.
   if (!dbUser) {
-    redirect("/sign-in");
+    redirect("/register-agri");
   }
 
   const farmerResponse = await getFarmerRecords();

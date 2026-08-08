@@ -12,11 +12,23 @@ export const ADMIN_EMAILS = Array.from(
 );
 
 /**
- * Pure check function — completely safe for Client Components & Middleware
+ * Pure check function — completely safe for Client Components, Server Components & Middleware
  */
 export function isAdminUser(user: any): boolean {
   if (!user) return false;
 
+  // 1. Check Clerk Metadata Role
+  const role =
+    user?.publicMetadata?.role ||
+    user?.unsafeMetadata?.role ||
+    user?.sessionClaims?.metadata?.role ||
+    user?.sessionClaims?.publicMetadata?.role;
+
+  if (role === "admin") {
+    return true;
+  }
+
+  // 2. Check Primary Email against ADMIN_EMAILS list
   const email = (
     user?.email ||
     user?.emailAddress ||

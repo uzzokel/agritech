@@ -8,7 +8,15 @@ import { isAdminUser } from "@/lib/admin";
 import AdminAnalytics from "@/app/admin/components/AdminAnalytics"; 
 import ExportCSVButton from "@/app/admin/components/ExportCSVButton"; 
 
-export default function DashboardClientView({ user }: { user: any }) {
+interface DashboardClientViewProps {
+  user: any;
+  initialFarmers?: any[];
+}
+
+export default function DashboardClientView({ 
+  user, 
+  initialFarmers = [] 
+}: DashboardClientViewProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "register" | "farmers" | "analytics">("overview");
   const [filterMode, setFilterMode] = useState<"all" | "my">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,8 +26,8 @@ export default function DashboardClientView({ user }: { user: any }) {
   const [enterpriseFilter, setEnterpriseFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
 
-  const [farmers, setFarmers] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [farmers, setFarmers] = useState<any[]>(initialFarmers);
+  const [isLoading, setIsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const adminAuthorized = isAdminUser(user);
@@ -38,9 +46,12 @@ export default function DashboardClientView({ user }: { user: any }) {
     }
   };
 
+  // Sync state if server-passed initialFarmers updates
   useEffect(() => {
-    loadFarmers();
-  }, []);
+    if (initialFarmers.length > 0) {
+      setFarmers(initialFarmers);
+    }
+  }, [initialFarmers]);
 
   // Filter farmers for Directory View
   const filteredFarmers = farmers.filter((farmer) => {

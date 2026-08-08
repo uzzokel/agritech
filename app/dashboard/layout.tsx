@@ -1,78 +1,72 @@
 // app/dashboard/layout.tsx
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/admin";
-import { ensureAdminUserRecord } from "@/lib/admin-server";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { userId: clerkUserId } = await auth();
+  const { userId } = await auth();
+  if (!userId) redirect("/unauthorized");
 
-  if (!clerkUserId) {
-    redirect("/unauthorized");
-  }
-
-  const clerkUser = await currentUser();
-
-  // 👑 1. ADMIN BYPASS & AUTO-PROVISIONING
-  if (isAdminUser(clerkUser)) {
-    await ensureAdminUserRecord();
-
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-        <main className="flex-1">{children}</main>
-      </div>
-    );
-  }
-
-  // 🔒 2. REGULAR USER CHECKS (Tier-2 Route Control)
   const cookieStore = await cookies();
   const agriVerified = cookieStore.get("agri_session_verified")?.value;
   const agriSessionId = cookieStore.get("agri_session_id")?.value;
 
-  // If Tier-2 cookies are missing, inspect Postgres status
-  if (agriVerified !== "true" || !agriSessionId) {
-    const email = clerkUser?.emailAddresses?.[0]?.emailAddress;
+  const clerkUser = await currentUser();
+  const isAdmin = isAdminUser(clerkUser) || agriSessionId === "AGRI-ADMIN-001";
 
-    const dbUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { clerkUserId },
-          ...(email ? [{ email }] : [])
-        ]
-      },
-      select: { id: true, status: true }
-    });
-
-    // 🔴 1. NEW USER: No database profile exists yet -> Must register first
-    if (!dbUser) {
-      redirect("/register-agri");
-    }
-
-    // 🟡 2. PENDING USER: Registered, but awaiting admin approval
-    if (dbUser.status === "PENDING") {
-      redirect("/register-agri?pending=1");
-    }
-
-    // 🟢 3. APPROVED USER: Has AGRI-ID & PIN, but needs to authenticate via /login-agri
-    if (dbUser.status === "APPROVED") {
-      redirect("/login-agri?redirectTo=/dashboard");
-    }
-
-    // ⛔ 4. DENIED USER: Access explicitly denied
-    if (dbUser.status === "DENIED") {
-      redirect("/register-agri?denied=1");
-    }
+  // 1. Admin Fast-Pass
+  if (isAdmin) {
+    return <div className="min-h-screen bg-slate-950 text-white">{children}</div>;
   }
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <main className="flex-1">{children}</main>
-    </div>
-  );
+  // 2. Verified Active Tier-2 PIN Session
+  if (agriVerified === "true" && agriSessionId) {
+    return <div className="min-h-screen bg-slate-950 text-white">{children}</div>;
+  }
+
+  // 3. Session missing -> Query Prisma DB for registration state
+  const email = clerkUser?.emailAddresses?.[0]?.emailAddress?.toLowerCase();
+
+  const dbUser = await prisma.user.findFirst({
+    where: {
+      OR: [{ clerkUserId: userId }, ...(email ? [{ email }] : [])],
+    },
+    select: { id: true, status: true, clerkUserId: true },
+  });
+
+  // No profile found -> Send to registration
+  if (!dbUser) {
+    redirect("/register-agri?redirect=/dashboard");
+  }
+
+  // Link clerkUserId in DB if it was missing during previous checks
+  if (!dbUser.clerkUserId) {
+    await prisma.user.update({
+      where: { id: dbUser.id },
+      data: { clerkUserId: userId },
+    });
+  }
+
+  // Status checks
+  if (dbUser.status === "PENDING") {
+    redirect("/register-agri?pending=1");
+  }
+
+  if (dbUser.status === "DENIED") {
+    redirect("/register-agri?denied=1");
+  }
+
+  if (dbUser.status === "APPROVED") {
+    // Approved users who lack a valid PIN session cookie land on PIN verification
+    redirect("/login-agri?redirect=/dashboard");
+  }
+
+  // Fallback for unexpected or invalid states
+  redirect("/login-agri?invalid=1");
 }

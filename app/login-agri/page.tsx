@@ -2,25 +2,68 @@
 "use client";
 
 import { useActionState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginAgriUser } from "@/app/actions/login-agri";
+import { useUser } from "@clerk/nextjs";
+import { loginAgriUser, type AgriActionResult } from "./actions";
 import { KeyRound, ShieldCheck, Loader2 } from "lucide-react";
 
+// Helper to check client-side cookies
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 function LoginFormContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { isLoaded, user } = useUser();
   const targetRedirect = searchParams.get("redirect") || "/dashboard";
 
-  const [state, formAction, isPending] = useActionState(loginAgriUser, {
-    success: false,
-    error: null,
-  });
+  // Explicit generic types prevent TypeScript from inferring `state` as `never`
+  const [state, formAction, isPending] = useActionState<AgriActionResult, FormData>(
+    loginAgriUser,
+    null
+  );
 
+  // 1. Authorization checks for Admins & Pre-verified users
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    // Admin Bypass: Forward immediately if user is an Admin
+    const userRole = user?.publicMetadata?.role;
+    if (userRole === "admin") {
+      router.replace(targetRedirect);
+      return;
+    }
+
+    // Verified Tier-2 Session Check: Forward if already authenticated
+    const agriVerified = getCookie("agri_session_verified");
+    const agriSessionId = getCookie("agri_session_id");
+
+    if (agriVerified === "true" && agriSessionId) {
+      router.replace(targetRedirect);
+      return;
+    }
+  }, [isLoaded, user, targetRedirect, router]);
+
+  // 2. Form submission success handler
   useEffect(() => {
     if (state?.success) {
       window.location.href = targetRedirect;
     }
   }, [state?.success, targetRedirect]);
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center gap-2 text-emerald-400 font-medium">
+        <Loader2 className="w-6 h-6 animate-spin" /> Checking authorization status...
+      </div>
+    );
+  }
+
+  const defaultEmail = user?.primaryEmailAddress?.emailAddress || "";
 
   return (
     <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
@@ -33,7 +76,7 @@ function LoginFormContent() {
           AgriTech Portal
         </h1>
         <p className="text-slate-400 text-sm mt-1">
-          Enter your official AGRI-ID and Security PIN
+          Enter your official AGRI-ID or Email and Security PIN
         </p>
       </div>
 
@@ -50,14 +93,15 @@ function LoginFormContent() {
 
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-            Official AGRI-ID
+            Official AGRI-ID / Email
           </label>
           <input
             type="text"
-            name="uniqueAdminId"
-            placeholder="e.g. AGRI-12345"
+            name="agriIdOrEmail"
+            defaultValue={defaultEmail}
+            placeholder="e.g. AGRI-123456 or user@example.com"
             required
-            className="w-full bg-slate-800 border border-slate-700 text-emerald-400 placeholder-slate-500 rounded-xl px-4 py-3 font-mono text-lg uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className="w-full bg-slate-800 border border-slate-700 text-emerald-400 placeholder-slate-500 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
           />
         </div>
 
@@ -70,7 +114,7 @@ function LoginFormContent() {
               type="password"
               name="securityPin"
               maxLength={10}
-              placeholder="Enter PIN"
+              placeholder="Enter Security PIN"
               required
               className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-3 font-mono tracking-widest text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             />
@@ -114,7 +158,7 @@ export default function AgriLoginPage() {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 py-30">
       <Suspense
         fallback={
-          <div className="flex items-center gap-2 text-emerald-400">
+          <div className="flex items-center gap-2 text-emerald-400 font-medium">
             <Loader2 className="w-6 h-6 animate-spin" /> Loading Portal...
           </div>
         }
