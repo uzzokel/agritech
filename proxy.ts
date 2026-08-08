@@ -1,21 +1,8 @@
 // middleware.ts
-import { clerkMiddleware, createRouteMatcher, createClerkClient } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { ADMIN_EMAILS } from "@/lib/admin";
 
-// Extend Clerk's SessionClaims interface
-declare global {
-  interface CustomSessionClaims {
-    email?: string;
-    primaryEmail?: string;
-    email_address?: string;
-    metadata?: {
-      role?: string;
-    };
-  }
-}
-
-// Protected routes using clean single-pattern matching
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
   "/features(.*)",
@@ -27,12 +14,17 @@ const isAuthRoute = createRouteMatcher([
   "/register-agri(.*)",
 ]);
 
-// Helper to prevent open-redirect vulnerabilities
-function getSafeRedirectUrl(rawParam: string | null, fallback = "/dashboard"): string {
+// Helper to prevent open-redirect vulnerabilities and self-referential loops
+function getSafeRedirectUrl(rawParam: string | null, currentPath: string, fallback = "/dashboard"): string {
   if (!rawParam) return fallback;
+  
+  // Clean query params to prevent self-looping like /dashboard?redirect=/dashboard
+  const cleanParam = rawParam.split("?")[0];
+  if (cleanParam === currentPath) return fallback;
+
   const safePrefixes = ["/dashboard", "/features", "/blog"];
-  const isSafe = safePrefixes.some((prefix) => rawParam.startsWith(prefix));
-  return isSafe ? rawParam : fallback;
+  const isSafe = safePrefixes.some((prefix) => cleanParam.startsWith(prefix));
+  return isSafe ? cleanParam : fallback;
 }
 
 export default clerkMiddleware(async (auth, req) => {
@@ -43,8 +35,6 @@ export default clerkMiddleware(async (auth, req) => {
 
   const { userId, sessionClaims } = await auth();
   const { pathname, searchParams } = req.nextUrl;
-
-  const claims = sessionClaims as unknown as CustomSessionClaims;
 
   // Forward x-pathname header
   const requestHeaders = new Headers(req.headers);
@@ -57,36 +47,27 @@ export default clerkMiddleware(async (auth, req) => {
       },
     });
 
-  // 1. EXTRACT USER EMAIL FROM CLAIMS
-  let userEmail: string | undefined = (
-    claims?.email ||
-    claims?.primaryEmail ||
-    claims?.email_address
+  // 1. FAST ZERO-NETWORK EMAIL EXTRACTION FROM CLERK SESSION CLAIMS
+  const claims = sessionClaims as Record<string, unknown> | undefined;
+  const userEmail = (
+    (claims?.email as string) ||
+    (claims?.primaryEmail as string) ||
+    (claims?.email_address as string) ||
+    ((claims?.primary_email_address as Record<string, string>)?.email_address)
   )?.toLowerCase();
-
-  if (userId && !userEmail) {
-    try {
-      const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-      const user = await clerk.users.getUser(userId);
-      userEmail = user.primaryEmailAddress?.emailAddress?.toLowerCase() ?? undefined;
-    } catch (err) {
-      console.error("Failed to fetch Clerk user email in middleware:", err);
-    }
-  }
 
   // 👑 2. ADMIN CHECK & BYPASS
   const isAdmin =
     Boolean(userId) &&
-    ((userEmail ? ADMIN_EMAILS.includes(userEmail) : false) || claims?.metadata?.role === "admin");
+    ((userEmail ? ADMIN_EMAILS.includes(userEmail) : false) ||
+      (claims?.metadata as Record<string, unknown>)?.role === "admin");
 
   if (isAdmin) {
-    // If admin lands on auth routes, redirect them cleanly to target without loop
     if (isAuthRoute(req)) {
-      const redirectTo = getSafeRedirectUrl(searchParams.get("redirect"));
+      const redirectTo = getSafeRedirectUrl(searchParams.get("redirect"), pathname);
       return NextResponse.redirect(new URL(redirectTo, req.url));
     }
 
-    // Check if admin already has cookies set in incoming request to avoid infinite response looping
     const hasAdminCookies =
       req.cookies.get("agri_session_verified")?.value === "true" &&
       req.cookies.get("agri_session_id")?.value === "AGRI-ADMIN-001";
@@ -94,8 +75,6 @@ export default clerkMiddleware(async (auth, req) => {
     const response = nextWithHeaders();
 
     if (!hasAdminCookies) {
-      console.log(`⚡ [ADMIN BYPASS] Auto-minting AGRI-ADMIN-001 session for ${userEmail ?? "Admin"} at ${pathname}`);
-      
       const cookieOptions = {
         path: "/",
         httpOnly: true,
@@ -111,26 +90,41 @@ export default clerkMiddleware(async (auth, req) => {
     return response;
   }
 
-  // 3. REQUIRE CLERK LOGIN (TIER 1)
+  // 3. REQUIRE CLERK LOGIN (TIER 1) - Send unauthenticated users to /unauthorized
   if (isProtectedRoute(req) && !userId) {
     const unauthorizedUrl = new URL("/unauthorized", req.url);
-    unauthorizedUrl.searchParams.set("redirect_url", pathname);
+    if (pathname !== "/dashboard") {
+      unauthorizedUrl.searchParams.set("redirect", pathname);
+    }
     return NextResponse.redirect(unauthorizedUrl);
   }
 
+  // ⚡ 3.5. PIN & REGISTRATION VERIFICATION CHECK FOR REGULAR USERS
+  if (isProtectedRoute(req) && userId) {
+    const agriVerified = req.cookies.get("agri_session_verified")?.value;
+    const agriSessionId = req.cookies.get("agri_session_id")?.value;
+
+    if (agriVerified === "false" && agriSessionId) {
+      const loginUrl = new URL("/login-agri", req.url);
+      if (pathname !== "/dashboard") {
+        loginUrl.searchParams.set("redirect", pathname);
+      }
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   // 4. PREVENT AUTH LOOPS FOR FULLY VERIFIED REGULAR USERS
-  // If a regular user with valid cookies lands on /login-agri or /register-agri, send them to dashboard
   if (isAuthRoute(req) && userId) {
     const agriVerified = req.cookies.get("agri_session_verified")?.value;
     const agriSessionId = req.cookies.get("agri_session_id")?.value;
 
     if (agriVerified === "true" && agriSessionId) {
-      const targetDestination = getSafeRedirectUrl(searchParams.get("redirect"));
+      const targetDestination = getSafeRedirectUrl(searchParams.get("redirect"), pathname);
       return NextResponse.redirect(new URL(targetDestination, req.url));
     }
   }
 
-  // 5. CLEAR STALE SESSIONS
+  // 5. CLEAR STALE SESSIONS ON LOGOUT
   if (isAuthRoute(req) && searchParams.get("invalid") === "1") {
     const response = nextWithHeaders();
     response.cookies.delete({ name: "agri_session_verified", path: "/" });
@@ -138,8 +132,6 @@ export default clerkMiddleware(async (auth, req) => {
     return response;
   }
 
-  // 6. PASS REGULAR UNVERIFIED USERS THROUGH TO LAYOUT / PAGE
-  // DashboardLayout and protectAgriRoute will query Prisma to decide between /register-agri or /login-agri
   return nextWithHeaders();
 });
 

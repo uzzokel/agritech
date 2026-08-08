@@ -28,10 +28,10 @@ export default function Navbar() {
 
   const handleCustomSignOut = async () => {
     try {
-      // 1. Clear AGRI session cookie on server
+      // 1. Clear AGRI PIN session cookies on server
       await deleteAgriSessionCookie();
       // 2. Sign out of Clerk and redirect to login
-      await signOut({ redirectUrl: "/login-agri" });
+      await signOut({ redirectUrl: "/login-agri?invalid=1" });
     } catch (error) {
       console.error("Signout error:", error);
     }
@@ -66,9 +66,9 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex w-full items-center justify-between h-16">
-          {/* Left Side: Logo */}
+          {/* Left Side: Logo with required isScrolled prop */}
           <div className="flex-shrink-0">
-            <Logo />
+            <Logo isScrolled={isScrolled} />
           </div>
 
           {/* Right Side: Navigation controls */}
@@ -99,21 +99,23 @@ export default function Navbar() {
                       </Link>
                     )}
 
+                    {/* Self-closing UserButton */}
                     <UserButton 
                       appearance={{
                         elements: {
                           userButtonAvatarBox: "w-9 h-9 border border-emerald-500/20 hover:scale-105 transition duration-200",
                         }
                       }}
+                    />
+
+                    {/* Dedicated Tier-2 Sign Out Button */}
+                    <button
+                      onClick={handleCustomSignOut}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition cursor-pointer"
+                      title="Log out of AgriTech"
                     >
-                      <UserButton.MenuItems>
-                        <UserButton.Action
-                          label="Log out of AgriTech"
-                          labelIcon={<LogOut className="w-4 h-4 text-red-500" />}
-                          onClick={handleCustomSignOut}
-                        />
-                      </UserButton.MenuItems>
-                    </UserButton>
+                      <LogOut className="w-5 h-5" />
+                    </button>
                   </div>
                 </Show>
               </div>
@@ -133,7 +135,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Rendering our sliding Mobile Menu */}
+      {/* Rendering sliding Mobile Menu */}
       <MobileMenu menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
     </header>
   );
