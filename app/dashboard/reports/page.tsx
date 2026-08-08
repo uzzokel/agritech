@@ -49,6 +49,7 @@ const OFFICER_ROLES = [
 ] as const;
 
 const ADMIN_EMAIL = "uzzokel@gmail.com";
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit matching next.config.ts
 
 export default function ReportsPage() {
   const { user } = useUser();
@@ -64,6 +65,7 @@ export default function ReportsPage() {
   const [recommendations, setRecommendations] = useState("");
   const [adminReportFile, setAdminReportFile] = useState<File | null>(null);
   const [adminReportMeta, setAdminReportMeta] = useState<AdminSummaryData | null>(null);
+  const [adminFileError, setAdminFileError] = useState<string | null>(null);
 
   const [newCommentContent, setNewCommentContent] = useState("");
   const commentAuthorName = isAdmin ? "Admin Lead" : (user?.fullName || "Field Officer");
@@ -72,6 +74,7 @@ export default function ReportsPage() {
   const [customName, setCustomName] = useState(user?.fullName || "Dr. Jane Smith");
   const [customState, setCustomState] = useState("Lagos State");
   const [userFile, setUserFile] = useState<File | null>(null);
+  const [userFileError, setUserFileError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const [userReports, setUserReports] = useState<UserReport[]>([]);
@@ -118,6 +121,34 @@ export default function ReportsPage() {
     document.body.removeChild(anchor);
   };
 
+  const handleAdminFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAdminFileError(null);
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        setAdminFileError("File size exceeds 10MB limit. Please select a smaller file.");
+        setAdminReportFile(null);
+        e.target.value = "";
+        return;
+      }
+      setAdminReportFile(file);
+    }
+  };
+
+  const handleUserFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUserFileError(null);
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        setUserFileError("File size exceeds 10MB limit. Please select a smaller file.");
+        setUserFile(null);
+        e.target.value = "";
+        return;
+      }
+      setUserFile(file);
+    }
+  };
+
   const handleSummarySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
@@ -130,6 +161,10 @@ export default function ReportsPage() {
     }
     if (!adminReportFile && !adminReportMeta) {
       alert("Please attach a compiled master report file.");
+      return;
+    }
+    if (adminReportFile && adminReportFile.size > MAX_FILE_SIZE) {
+      setAdminFileError("File size exceeds 10MB limit.");
       return;
     }
 
@@ -178,6 +213,10 @@ export default function ReportsPage() {
       alert("Please attach a document report before submitting.");
       return;
     }
+    if (userFile.size > MAX_FILE_SIZE) {
+      setUserFileError("File size exceeds 10MB limit.");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("authorName", customName);
@@ -215,6 +254,7 @@ export default function ReportsPage() {
             <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${isAdmin ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-blue-500/20 text-blue-300 border border-blue-500/30"}`}>
               {isAdmin ? "Admin" : "Field User"}
             </span>
+
           </div>
         </div>
 
@@ -268,7 +308,6 @@ export default function ReportsPage() {
                       <p className="text-sm text-slate-500">Live data insights synced directly from your data warehouse.</p>
                     </div>
                   </div>
-                  {/* Expanded height to h-[750px] or h-[calc(100vh-280px)] */}
                   <div className="w-full h-[550px] bg-slate-900 rounded-lg overflow-hidden flex flex-col items-center justify-center relative border border-slate-800 shadow-inner">
                     <iframe title="PowerBI Dashboard" className="w-200 h-350 border-0" src="https://app.powerbi.com/reportEmbed?reportId=32ab744b-dec3-4598-8eba-1fc26f298fb6&autoAuth=true&ctid=6d6a2580-7139-4209-acaa-0b5b7c8398a5&actionBarEnabled=true" allowFullScreen={true}></iframe>
                   </div>
@@ -284,7 +323,6 @@ export default function ReportsPage() {
                       <p className="text-sm text-slate-500">Review aggregated intelligence and master documents.</p>
                     </div>
 
-                    {/* Both Admin and Users can download the master report summary */}
                     <button
                       onClick={() => handleDownload(adminReportMeta?.fileUrl || "#", adminReportMeta?.fileName || "Master_Aggregated_Summary.pdf")}
                       disabled={!adminReportMeta?.fileUrl}
@@ -295,7 +333,6 @@ export default function ReportsPage() {
                     </button>
                   </div>
 
-                  {/* ONLY ADMIN CAN VIEW/EDIT THE UPLOAD FORM */}
                   {isAdmin && !hasSubmittedSummary ? (
                     <form onSubmit={handleSummarySubmit} className="space-y-6">
                       <div className="p-6 rounded-xl border border-slate-700 shadow-inner space-y-4 text-white" style={{ backgroundColor: "#1e293b" }}>
@@ -321,11 +358,12 @@ export default function ReportsPage() {
                           </label>
                           <input
                             type="file"
-                            onChange={(e) => e.target.files && setAdminReportFile(e.target.files[0])}
+                            onChange={handleAdminFileChange}
                             className="w-full text-xs text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
                             accept=".pdf,.xlsx,.docx"
                             required={!adminReportMeta}
                           />
+                          {adminFileError && <p className="text-xs text-red-400 mt-2 font-medium">{adminFileError}</p>}
                           {adminReportFile && <p className="text-xs text-emerald-400 mt-2">Attached: {adminReportFile.name}</p>}
                         </div>
                       </div>
@@ -469,7 +507,7 @@ export default function ReportsPage() {
                       <input
                         type="file"
                         id="user-file-input"
-                        onChange={(e) => e.target.files && setUserFile(e.target.files[0])}
+                        onChange={handleUserFileChange}
                         className="hidden"
                         accept=".pdf,.csv,.xlsx,.docx"
                       />
@@ -481,6 +519,8 @@ export default function ReportsPage() {
                         <span className="text-xs text-slate-400">PDF, CSV, XLSX, or DOCX (Max 10MB)</span>
                       </label>
                     </div>
+
+                    {userFileError && <p className="text-xs text-red-400 font-medium text-center">{userFileError}</p>}
 
                     <div className="flex justify-end">
                       <button
@@ -529,7 +569,6 @@ export default function ReportsPage() {
                                 </td>
                                 <td className="p-3">{new Date(rep.createdAt).toLocaleDateString()}</td>
                                 <td className="p-3 text-right space-x-2">
-                                  {/* ONLY ADMIN CAN VIEW DOWNLOAD & DELETE BUTTONS */}
                                   {isAdmin ? (
                                     <>
                                       <button

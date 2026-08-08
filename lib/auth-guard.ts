@@ -55,8 +55,9 @@ export async function requireAgriUser() {
     };
   }
 
-  // 2. Database Lookup
+  // 2. Database Lookup (Isolated from redirects)
   let userRecord = null;
+  let dbError = false;
   try {
     console.log("🔍 [Auth Guard] Querying database for clerkUserId:", userId);
     const dbUser = await prisma.user.findFirst({
@@ -67,8 +68,13 @@ export async function requireAgriUser() {
       where: { email: userEmail },
     }) : null);
     console.log("📦 [Auth Guard] Database lookup result:", userRecord ? "Found user" : "User not found");
-  } catch (error) {
+  } catch (error: any) {
+    // Crucial: Re-throw NEXT_REDIRECT if it somehow gets caught here
+    if (error?.message === "NEXT_REDIRECT" || error?.digest?.includes("NEXT_REDIRECT")) {
+      throw error;
+    }
     console.error("💥 [Auth Guard] Database error:", error);
+    dbError = true;
   }
 
   // 3. Rule 1: Must register first
@@ -83,7 +89,7 @@ export async function requireAgriUser() {
     redirect(`/register-agri?status=${userRecord.status.toLowerCase()}`);
   }
 
-  // 5. Rule 3: PIN session verification (Relaxed strict ID check to prevent session loops)
+  // 5. Rule 3: PIN session verification
   if (agriVerified !== "true" || !agriSessionId) {
     console.log("🔐 [Auth Guard] Invalid PIN session -> redirecting to /login-agri");
     redirect("/login-agri?redirect=/dashboard");

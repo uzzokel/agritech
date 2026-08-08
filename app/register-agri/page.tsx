@@ -14,21 +14,6 @@ const DESIGNATION_OPTIONS = [
   "Field Data Collector",
 ] as const;
 
-// Helper to check for client-side cookies
-function getCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
-// Safely sanitize redirect query parameter to prevent Open Redirects
-function getSafeRedirectUrl(rawParam: string | null): string {
-  if (!rawParam) return "/dashboard";
-  const safePrefixes = ["/dashboard", "/features", "/blog"];
-  const isSafe = safePrefixes.some((prefix) => rawParam.startsWith(prefix));
-  return isSafe ? rawParam : "/dashboard";
-}
-
 function RegisterFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,20 +33,9 @@ function RegisterFormContent() {
     securityPin: "",
   });
 
-  // Client-Side Session Hydration & Form Prefill
+  // Client-Side Form Prefill (Cookie check redirect removed to prevent routing loops)
   useEffect(() => {
     if (!isLoaded || !user) return;
-
-    const safeRedirect = getSafeRedirectUrl(searchParams.get("redirect"));
-
-    // Check if Tier-2 verified session cookies are already present in browser storage
-    const agriVerified = getCookie("agri_session_verified");
-    const agriSessionId = getCookie("agri_session_id");
-
-    if (agriVerified === "true" && agriSessionId) {
-      router.replace(safeRedirect);
-      return;
-    }
 
     // Auto-fill Clerk primary credentials into initial form state
     const primaryEmail = user.primaryEmailAddress?.emailAddress || "";
@@ -73,7 +47,7 @@ function RegisterFormContent() {
       email: prev.email || primaryEmail,
       fullName: prev.fullName || fullName,
     }));
-  }, [isLoaded, user, router, searchParams]);
+  }, [isLoaded, user]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
