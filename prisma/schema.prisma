@@ -45,7 +45,7 @@ model User {
 // Farmer Registration Model
 // ==========================================
 model Farmer {
-  id                     String  @id @default(uuid())
+  id                     String   @id @default(uuid())
   fullName               String
   age                    Int
   gender                 String
@@ -98,7 +98,6 @@ model AdminReportComment {
   summaryId String
   summary   AdminReportSummary @relation(fields: [summaryId], references: [id], onDelete: Cascade)
 
-  // Make userId optional so comments can be posted safely even if user reference is missing/omitted
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -106,4 +105,41 @@ model AdminReportComment {
   authorRole String
   content    String   @db.Text
   createdAt  DateTime @default(now())
+}
+
+// ==========================================
+// 1. First Table: WorkPlan & Budget Uploads
+// ==========================================
+model WorkPlan {
+  id                  String   @id @default(uuid())
+  componentName       String   // e.g. "Component 1: Capacity building"
+  budgetCategory      String   // CIVIL_WORKS, PERSONNEL, CONSULTANCY, GOODS_EQUIPMENT, TRAINING_TRAVELS
+  description         String   @db.Text // Max 300 words description
+  detailedCalculation String   @db.Text // Calculation details text
+  totalCostEstimate   Float    // Cost in chosen currency
+  currency            String   @default("USD")
+  timeFrame           String   // e.g. "Q1 2026 (Months 1-3)"
+  expectedOutput      String   @db.Text // Narrative of expected results
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Linked performance tracking record (1-to-1 relation)
+  performance         BudgetPerformance?
+}
+
+// ==========================================
+// 2. Second Table: Budget Performance (Linked)
+// ==========================================
+model BudgetPerformance {
+  id              String   @id @default(uuid())
+  workPlanId      String   @unique
+  workPlan        WorkPlan @relation(fields: [workPlanId], references: [id], onDelete: Cascade)
+
+  amountDisbursed Float    @default(0.0)
+  actualOutput    String?  @db.Text // Actual progress notes
+  statusFlag      String   @default("GREEN") // GREEN, AMBER, RED
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
