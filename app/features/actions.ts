@@ -89,3 +89,46 @@ export async function updatePerformanceItem(performanceId: string, updates: {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Aggregates WorkPlan totalCostEstimate (Target) and BudgetPerformance amountDisbursed (Actual)
+ * grouped by budgetCategory for the Line Chart visualization.
+ */
+export async function getPerformanceChartData() {
+  try {
+    await requireAgriUser();
+
+    const workPlans = await prisma.workPlan.findMany({
+      include: {
+        performance: true,
+      },
+    });
+
+    const aggregatedMap: Record<string, { category: string; Target: number; Actual: number }> = {};
+
+    workPlans.forEach((item) => {
+      const key = item.budgetCategory;
+
+      if (!aggregatedMap[key]) {
+        aggregatedMap[key] = {
+          category: key,
+          Target: 0,
+          Actual: 0,
+        };
+      }
+
+      // Sum up Target costs from WorkPlan
+      aggregatedMap[key].Target += item.totalCostEstimate || 0;
+
+      // Sum up Actual disbursed funds from BudgetPerformance
+      if (item.performance) {
+        aggregatedMap[key].Actual += item.performance.amountDisbursed || 0;
+      }
+    });
+
+    return { success: true, data: Object.values(aggregatedMap) };
+  } catch (error: any) {
+    console.error("Failed to fetch chart data:", error);
+    return { success: false, data: [], error: error.message || "Failed to fetch chart data" };
+  }
+}

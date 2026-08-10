@@ -1,9 +1,8 @@
-// app/features/page.tsx
 "use client";
 
 import { useState } from "react";
 import { createWorkPlanItem } from "./actions";
-import { Loader2, CheckCircle2, ShieldAlert, PlusCircle } from "lucide-react";
+import { Loader2, CheckCircle2, ShieldAlert, PlusCircle, Download } from "lucide-react";
 
 const COMPONENTS = [
   "Component 1: Capacity building",
@@ -37,6 +36,28 @@ export default function UploadWorkPlanPage() {
     expectedOutput: "",
   });
 
+  const downloadCSV = () => {
+    const headers = ["Component", "Category", "Description", "Calculation", "Cost", "Currency", "TimeFrame", "ExpectedOutput"];
+    const values = [
+      `"${form.componentName.replace(/"/g, '""')}"`,
+      form.budgetCategory,
+      `"${form.description.replace(/"/g, '""')}"`,
+      `"${form.detailedCalculation.replace(/"/g, '""')}"`,
+      form.totalCostEstimate,
+      form.currency,
+      `"${form.timeFrame.replace(/"/g, '""')}"`,
+      `"${form.expectedOutput.replace(/"/g, '""')}"`
+    ];
+    
+    const csvContent = [headers.join(","), values.join(",")].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `workplan-item-${new Date().getTime()}.csv`;
+    a.click();
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -48,8 +69,19 @@ export default function UploadWorkPlanPage() {
     setErrorMsg("");
     setSuccessMsg("");
 
-    // Word count check for description (Max 300 words)
-    const wordCount = form.description.trim().split(/\s+/).length;
+    // Defensive payload construction
+    const payload = {
+      componentName: form.componentName || COMPONENTS[0],
+      budgetCategory: form.budgetCategory || BUDGET_CATEGORIES[0].value,
+      description: form.description,
+      detailedCalculation: form.detailedCalculation,
+      totalCostEstimate: parseFloat(form.totalCostEstimate) || 0,
+      currency: form.currency || "USD",
+      timeFrame: form.timeFrame,
+      expectedOutput: form.expectedOutput,
+    };
+
+    const wordCount = payload.description.trim().split(/\s+/).filter(Boolean).length;
     if (wordCount > 300) {
       setErrorMsg("Description cannot exceed 300 words.");
       setLoading(false);
@@ -57,10 +89,7 @@ export default function UploadWorkPlanPage() {
     }
 
     try {
-      const res = await createWorkPlanItem({
-        ...form,
-        totalCostEstimate: parseFloat(form.totalCostEstimate) || 0,
-      });
+      const res = await createWorkPlanItem(payload);
 
       if (res.success) {
         setSuccessMsg("Workplan and budget item successfully uploaded to Supabase database!");
@@ -77,8 +106,8 @@ export default function UploadWorkPlanPage() {
       } else {
         setErrorMsg(res.error || "Failed to save item.");
       }
-    } catch {
-      setErrorMsg("An unexpected error occurred.");
+    } catch (err: any) {
+      setErrorMsg(err.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -86,13 +115,22 @@ export default function UploadWorkPlanPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <PlusCircle className="text-[#16a34a] w-7 h-7" /> Upload Workplan and Budget
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Capture project activities, financial estimates, and expected outcomes mapped across the 5 core project components.
-        </p>
+      <div className="mb-8 flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <PlusCircle className="text-[#16a34a] w-7 h-7" /> Upload Workplan and Budget
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Capture project activities, financial estimates, and expected outcomes mapped across the 5 core project components.
+          </p>
+        </div>
+        <button 
+          type="button"
+          onClick={downloadCSV}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition cursor-pointer"
+        >
+          <Download className="w-4 h-4" /> Export Draft
+        </button>
       </div>
 
       {successMsg && (
@@ -110,12 +148,8 @@ export default function UploadWorkPlanPage() {
       )}
 
       <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
-        
-        {/* Column 1: Component Dropdown */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Column I: Project Component *
-          </label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column I: Project Component *</label>
           <select
             name="componentName"
             value={form.componentName}
@@ -124,18 +158,13 @@ export default function UploadWorkPlanPage() {
             required
           >
             {COMPONENTS.map((comp) => (
-              <option key={comp} value={comp} className="bg-slate-900 text-white">
-                {comp}
-              </option>
+              <option key={comp} value={comp} className="bg-slate-900 text-white">{comp}</option>
             ))}
           </select>
         </div>
 
-        {/* Column 2: Budget Category Dropdown */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Column II: Budget Category *
-          </label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column II: Budget Category *</label>
           <select
             name="budgetCategory"
             value={form.budgetCategory}
@@ -144,18 +173,13 @@ export default function UploadWorkPlanPage() {
             required
           >
             {BUDGET_CATEGORIES.map((cat) => (
-              <option key={cat.value} value={cat.value} className="bg-slate-900 text-white">
-                {cat.label}
-              </option>
+              <option key={cat.value} value={cat.value} className="bg-slate-900 text-white">{cat.label}</option>
             ))}
           </select>
         </div>
 
-        {/* Column 3: Description of Activities */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Column III: Description of Activities (Max 300 words) *
-          </label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column III: Description of Activities (Max 300 words) *</label>
           <textarea
             name="description"
             rows={4}
@@ -167,11 +191,8 @@ export default function UploadWorkPlanPage() {
           />
         </div>
 
-        {/* Column 4: Detailed Calculation */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Column IV: Detailed Calculation (Unit rates, quantities, formula breakdown) *
-          </label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column IV: Detailed Calculation (Unit rates, quantities, formula breakdown) *</label>
           <textarea
             name="detailedCalculation"
             rows={3}
@@ -183,12 +204,9 @@ export default function UploadWorkPlanPage() {
           />
         </div>
 
-        {/* Column 5: Total Cost Estimate & Currency */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-slate-300 mb-2">
-              Column V: Total Cost Estimate *
-            </label>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Column V: Total Cost Estimate *</label>
             <input
               type="number"
               step="0.01"
@@ -201,9 +219,7 @@ export default function UploadWorkPlanPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-2">
-              Currency
-            </label>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Currency</label>
             <select
               name="currency"
               value={form.currency}
@@ -217,11 +233,8 @@ export default function UploadWorkPlanPage() {
           </div>
         </div>
 
-        {/* Column 6: Expected Time Frame */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Column VI: Expected Time Frame (Quarters, Months, Days) *
-          </label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column VI: Expected Time Frame *</label>
           <input
             type="text"
             name="timeFrame"
@@ -233,11 +246,8 @@ export default function UploadWorkPlanPage() {
           />
         </div>
 
-        {/* Column 7: Expected Output and Outcome */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Column VII: Expected Output and Outcome *
-          </label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column VII: Expected Output and Outcome *</label>
           <textarea
             name="expectedOutput"
             rows={3}
