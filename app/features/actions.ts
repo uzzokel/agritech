@@ -47,7 +47,6 @@ export async function createWorkPlanItem(formData: {
 
     revalidatePath("/features");
 
-    // Convert Prisma Decimals to numbers for standard Server Action serialization
     return {
       success: true,
       data: {
@@ -228,7 +227,7 @@ export async function getPerformanceChartData() {
     > = {};
 
     workPlans.forEach((item) => {
-      const key = item.budgetCategory;
+      const key = item.budgetCategory || "Uncategorized";
 
       if (!aggregatedMap[key]) {
         aggregatedMap[key] = {
@@ -255,5 +254,126 @@ export async function getPerformanceChartData() {
       data: [],
       error: error.message || "Failed to fetch chart data",
     };
+  }
+}
+
+/* ============================================================================
+ * PERFORMANCE TARGET & ACTUAL ACTIONS (Matched to Schema Models)
+ * ============================================================================ */
+
+export async function createPerformanceTarget(formData: {
+  componentName: string;
+  expectedOutcomes: string;
+  targetPercentage: number;
+  baselineValue: number;
+  meansOfVerification: string;
+  timeFrame: string;
+  responsiblePerson: string;
+}) {
+  try {
+    await requireAgriUser();
+
+    const newTarget = await prisma.performanceTarget.create({
+      data: {
+        componentName: formData.componentName,
+        expectedOutcomes: formData.expectedOutcomes,
+        targetPercentage: Number(formData.targetPercentage) || 0,
+        baselineValue: Number(formData.baselineValue) || 0,
+        meansOfVerification: formData.meansOfVerification,
+        timeFrame: formData.timeFrame,
+        responsiblePerson: formData.responsiblePerson,
+      },
+    });
+
+    revalidatePath("/features/kpi");
+
+    return {
+      success: true,
+      data: newTarget,
+    };
+  } catch (error: any) {
+    console.error("Failed to create performance target:", error);
+    return { success: false, error: error.message || "Failed to save target indicator" };
+  }
+}
+
+export async function getPerformanceTargets() {
+  try {
+    await requireAgriUser();
+
+    const targets = await prisma.performanceTarget.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return { success: true, data: targets };
+  } catch (error: any) {
+    console.error("Failed to fetch performance targets:", error);
+    return { success: false, data: [], error: error.message };
+  }
+}
+
+export async function createOrUpdatePerformanceActual(formData: {
+  targetId: string;
+  actualValue: number;
+  remarks?: string;
+}) {
+  try {
+    await requireAgriUser();
+
+    // Check if an actual record already exists for this targetId
+    const existingActual = await prisma.performanceActual.findFirst({
+      where: { targetId: formData.targetId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    let actual;
+    if (existingActual) {
+      actual = await prisma.performanceActual.update({
+        where: { id: existingActual.id },
+        data: {
+          actualValue: Number(formData.actualValue) || 0,
+          remarks: formData.remarks || null,
+        },
+      });
+    } else {
+      actual = await prisma.performanceActual.create({
+        data: {
+          targetId: formData.targetId,
+          actualValue: Number(formData.actualValue) || 0,
+          remarks: formData.remarks || null,
+        },
+      });
+    }
+
+    revalidatePath("/features/kpi");
+
+    return {
+      success: true,
+      data: actual,
+    };
+  } catch (error: any) {
+    console.error("Failed to record performance actuals:", error);
+    return { success: false, error: error.message || "Failed to record actual progress" };
+  }
+}
+
+export async function getPerformanceMonitoringData() {
+  try {
+    await requireAgriUser();
+
+    const targets = await prisma.performanceTarget.findMany({
+      include: {
+        actuals: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return { success: true, data: targets };
+  } catch (error: any) {
+    console.error("Failed to fetch monitoring data:", error);
+    return { success: false, data: [], error: error.message };
   }
 }

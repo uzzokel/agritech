@@ -111,11 +111,11 @@ model AdminReportComment {
 // WorkPlan Category Model
 // ==========================================
 model Category {
-  id        String     @id @default(uuid())
-  name      String     @unique // e.g. "CIVIL_WORKS", "PERSONNEL", "CONSULTANCY", etc.
-  code      String?    @unique // Optional short code if needed
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g. "CIVIL_WORKS", "PERSONNEL", "CONSULTANCY", etc.
+  code      String?  @unique // Optional short code if needed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   workPlans WorkPlan[]
 }
@@ -163,4 +163,40 @@ model BudgetPerformance {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// 3. Performance Target (Table 1: Planning)
+// ==========================================
+model PerformanceTarget {
+  id                  String   @id @default(uuid())
+  componentName       String   // e.g., "Component 1: Capacity building"
+  expectedOutcomes    String   @db.Text // KPI narration (Max 300 words)
+  targetPercentage    Float    // Target in % (e.g., 100)
+  baselineValue       Float    @default(0.0) // Baseline value (0 if none)
+  meansOfVerification String   @db.Text // Means of verification description
+  timeFrame           String   // e.g., "Q3 2026 (Month 7 - Month 9)"
+  responsiblePerson   String   // Person or Unit responsible
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relation to Table 2 (Actuals & Progress Tracking)
+  actuals             PerformanceActual[]
+}
+
+// ==========================================
+// 4. Performance Actual (Table 2: Monitoring & Variance)
+// ==========================================
+model PerformanceActual {
+  id          String            @id @default(uuid())
+  targetId    String
+  target      PerformanceTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  actualValue Float             // Actual progress achieved
+  remarks     String?           @db.Text // Optional comments or notes
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([targetId])
 }

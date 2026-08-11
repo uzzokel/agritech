@@ -229,7 +229,7 @@ export default function UploadWorkPlanPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8 py-30">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
