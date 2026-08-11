@@ -58,7 +58,7 @@ model Farmer {
   userGroup              String
   nameOfChosenEnterprise String
   typeOfEnterprise       String
-  estimatedAnnualIncome  Float
+  estimatedAnnualIncome Float
   phoneNumber            String
   photoUrl               String?
 
@@ -116,7 +116,9 @@ model WorkPlan {
   budgetCategory      String   // CIVIL_WORKS, PERSONNEL, CONSULTANCY, GOODS_EQUIPMENT, TRAINING_TRAVELS
   description         String   @db.Text // Max 300 words description
   detailedCalculation String   @db.Text // Calculation details text
-  totalCostEstimate   Float    // Cost in chosen currency
+  unitCost            Float    @default(0.0) // Cost per unit
+  quantity            Float    @default(0.0) // Number of units
+  totalCostEstimate   Float    // Cost in chosen currency (unitCost * quantity)
   currency            String   @default("USD")
   timeFrame           String   // e.g. "Q1 2026 (Months 1-3)"
   expectedOutput      String   @db.Text // Narrative of expected results

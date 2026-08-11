@@ -10,6 +10,8 @@ export async function createWorkPlanItem(formData: {
   budgetCategory: string;
   description: string;
   detailedCalculation: string;
+  unitCost: number;
+  quantity: number;
   totalCostEstimate: number;
   currency: string;
   timeFrame: string;
@@ -25,7 +27,9 @@ export async function createWorkPlanItem(formData: {
         budgetCategory: formData.budgetCategory,
         description: formData.description,
         detailedCalculation: formData.detailedCalculation,
-        totalCostEstimate: Number(formData.totalCostEstimate),
+        unitCost: Number(formData.unitCost) || 0,
+        quantity: Number(formData.quantity) || 0,
+        totalCostEstimate: Number(formData.totalCostEstimate) || 0,
         currency: formData.currency || "USD",
         timeFrame: formData.timeFrame,
         expectedOutput: formData.expectedOutput,
@@ -42,35 +46,134 @@ export async function createWorkPlanItem(formData: {
     });
 
     revalidatePath("/features");
-    return { success: true, data: newItem };
+
+    // Convert Prisma Decimals to numbers for standard Server Action serialization
+    return {
+      success: true,
+      data: {
+        ...newItem,
+        unitCost: Number(newItem.unitCost),
+        quantity: Number(newItem.quantity),
+        totalCostEstimate: Number(newItem.totalCostEstimate),
+      },
+    };
   } catch (error: any) {
     console.error("Failed to create workplan item:", error);
     return { success: false, error: error.message || "Database write failed" };
   }
 }
 
-export async function getWorkPlanItemsWithPerformance() {
+/**
+ * Fetches standalone workplan items directly from Prisma for component initialization.
+ * Supports optional pagination parameters for high-volume datasets.
+ */
+export async function getWorkPlanItems(params?: { page?: number; limit?: number }) {
   try {
     await requireAgriUser();
-    // Fetch workplans with their linked performance records joined
-    const items = await prisma.workPlan.findMany({
-      include: {
-        performance: true,
+
+    const page = params?.page || 1;
+    const limit = params?.limit;
+    const skip = limit ? (page - 1) * limit : undefined;
+
+    const [items, totalCount] = await Promise.all([
+      prisma.workPlan.findMany({
+        orderBy: { createdAt: "desc" },
+        ...(limit ? { skip, take: limit } : {}),
+      }),
+      prisma.workPlan.count(),
+    ]);
+
+    const serializedData = items.map((item) => ({
+      ...item,
+      unitCost: Number(item.unitCost),
+      quantity: Number(item.quantity),
+      totalCostEstimate: Number(item.totalCostEstimate),
+    }));
+
+    return {
+      success: true,
+      data: serializedData,
+      pagination: {
+        totalCount,
+        totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        currentPage: page,
       },
-      orderBy: { createdAt: "desc" },
-    });
-    return { success: true, data: items };
+    };
   } catch (error: any) {
     console.error("Failed to fetch workplan items:", error);
-    return { success: false, data: [], error: error.message };
+    return {
+      success: false,
+      data: [],
+      error: error.message,
+      pagination: { totalCount: 0, totalPages: 1, currentPage: 1 },
+    };
   }
 }
 
-export async function updatePerformanceItem(performanceId: string, updates: {
-  amountDisbursed?: number;
-  actualOutput?: string;
-  statusFlag?: string;
-}) {
+/**
+ * Fetches workplans with their linked performance records joined.
+ * Supports optional pagination parameters.
+ */
+export async function getWorkPlanItemsWithPerformance(params?: { page?: number; limit?: number }) {
+  try {
+    await requireAgriUser();
+
+    const page = params?.page || 1;
+    const limit = params?.limit;
+    const skip = limit ? (page - 1) * limit : undefined;
+
+    const [items, totalCount] = await Promise.all([
+      prisma.workPlan.findMany({
+        include: {
+          performance: true,
+        },
+        orderBy: { createdAt: "desc" },
+        ...(limit ? { skip, take: limit } : {}),
+      }),
+      prisma.workPlan.count(),
+    ]);
+
+    const serializedData = items.map((item) => ({
+      ...item,
+      unitCost: Number(item.unitCost),
+      quantity: Number(item.quantity),
+      totalCostEstimate: Number(item.totalCostEstimate),
+      performance: item.performance
+        ? {
+            ...item.performance,
+            amountDisbursed: Number(item.performance.amountDisbursed),
+          }
+        : null,
+    }));
+
+    return {
+      success: true,
+      data: serializedData,
+      pagination: {
+        totalCount,
+        totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        currentPage: page,
+      },
+    };
+  } catch (error: any) {
+    console.error("Failed to fetch workplan items with performance:", error);
+    return {
+      success: false,
+      data: [],
+      error: error.message,
+      pagination: { totalCount: 0, totalPages: 1, currentPage: 1 },
+    };
+  }
+}
+
+export async function updatePerformanceItem(
+  performanceId: string,
+  updates: {
+    amountDisbursed?: number;
+    actualOutput?: string;
+    statusFlag?: string;
+  }
+) {
   try {
     await requireAgriUser();
 
@@ -83,7 +186,22 @@ export async function updatePerformanceItem(performanceId: string, updates: {
     });
 
     revalidatePath("/features");
-    return { success: true, data: updated };
+
+    return {
+      success: true,
+      data: {
+        ...updated,
+        amountDisbursed: Number(updated.amountDisbursed),
+        workPlan: updated.workPlan
+          ? {
+              ...updated.workPlan,
+              unitCost: Number(updated.workPlan.unitCost),
+              quantity: Number(updated.workPlan.quantity),
+              totalCostEstimate: Number(updated.workPlan.totalCostEstimate),
+            }
+          : null,
+      },
+    };
   } catch (error: any) {
     console.error("Failed to update performance record:", error);
     return { success: false, error: error.message };
@@ -104,7 +222,10 @@ export async function getPerformanceChartData() {
       },
     });
 
-    const aggregatedMap: Record<string, { category: string; Target: number; Actual: number }> = {};
+    const aggregatedMap: Record<
+      string,
+      { category: string; Target: number; Actual: number }
+    > = {};
 
     workPlans.forEach((item) => {
       const key = item.budgetCategory;
@@ -118,17 +239,21 @@ export async function getPerformanceChartData() {
       }
 
       // Sum up Target costs from WorkPlan
-      aggregatedMap[key].Target += item.totalCostEstimate || 0;
+      aggregatedMap[key].Target += Number(item.totalCostEstimate) || 0;
 
       // Sum up Actual disbursed funds from BudgetPerformance
       if (item.performance) {
-        aggregatedMap[key].Actual += item.performance.amountDisbursed || 0;
+        aggregatedMap[key].Actual += Number(item.performance.amountDisbursed) || 0;
       }
     });
 
     return { success: true, data: Object.values(aggregatedMap) };
   } catch (error: any) {
     console.error("Failed to fetch chart data:", error);
-    return { success: false, data: [], error: error.message || "Failed to fetch chart data" };
+    return {
+      success: false,
+      data: [],
+      error: error.message || "Failed to fetch chart data",
+    };
   }
 }

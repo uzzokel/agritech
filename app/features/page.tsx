@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { createWorkPlanItem } from "./actions";
-import { Loader2, CheckCircle2, ShieldAlert, PlusCircle, Download } from "lucide-react";
+import { useState, useEffect } from "react";
+import { createWorkPlanItem, getWorkPlanItems } from "./actions";
+import {
+  Loader2,
+  CheckCircle2,
+  ShieldAlert,
+  PlusCircle,
+  Download,
+  FileText,
+  Check,
+  RefreshCw,
+} from "lucide-react";
 
 const COMPONENTS = [
   "Component 1: Capacity building",
@@ -20,102 +29,208 @@ const BUDGET_CATEGORIES = [
   { label: "Training and Travels", value: "TRAINING_TRAVELS" },
 ] as const;
 
+interface SavedWorkPlanItem {
+  id: string;
+  componentName: string;
+  budgetCategory: string;
+  description: string;
+  detailedCalculation: string;
+  unitCost: number | string;
+  quantity: number | string;
+  totalCostEstimate: number | string;
+  currency: string;
+  timeFrame: string;
+  expectedOutput: string;
+}
+
 export default function UploadWorkPlanPage() {
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [form, setForm] = useState({
+  const [savedItems, setSavedItems] = useState<SavedWorkPlanItem[]>([]);
+
+  const [form, setForm] = useState<Omit<SavedWorkPlanItem, "id">>({
     componentName: COMPONENTS[0],
     budgetCategory: BUDGET_CATEGORIES[0].value,
     description: "",
     detailedCalculation: "",
-    totalCostEstimate: "",
+    unitCost: "",
+    quantity: "",
+    totalCostEstimate: "0.00",
     currency: "USD",
     timeFrame: "",
     expectedOutput: "",
   });
 
-  const downloadCSV = () => {
-    const headers = ["Component", "Category", "Description", "Calculation", "Cost", "Currency", "TimeFrame", "ExpectedOutput"];
-    const values = [
-      `"${form.componentName.replace(/"/g, '""')}"`,
-      form.budgetCategory,
-      `"${form.description.replace(/"/g, '""')}"`,
-      `"${form.detailedCalculation.replace(/"/g, '""')}"`,
-      form.totalCostEstimate,
-      form.currency,
-      `"${form.timeFrame.replace(/"/g, '""')}"`,
-      `"${form.expectedOutput.replace(/"/g, '""')}"`
+  const getCategoryLabel = (value: string) =>
+    BUDGET_CATEGORIES.find((cat) => cat.value === value)?.label || value;
+
+  const formatCurrency = (amount: number | string, currency: string) => {
+    const numeric = typeof amount === "string" ? parseFloat(amount) || 0 : amount;
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency,
+        minimumFractionDigits: 2,
+      }).format(numeric);
+    } catch {
+      return `${currency} ${numeric.toFixed(2)}`;
+    }
+  };
+
+  useEffect(() => {
+    fetchExistingWorkPlanItems();
+  }, []);
+
+  const fetchExistingWorkPlanItems = async () => {
+    setFetching(true);
+    try {
+      const res = await getWorkPlanItems();
+      if (res.success && res.data) {
+        setSavedItems(res.data);
+      } else if (res.error) {
+        console.error("Failed to fetch workplan items:", res.error);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load items";
+      console.error("Error fetching workplan items:", message);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const escapeCsvCell = (value: string | number | undefined | null) => {
+    if (value === undefined || value === null) return '""';
+    const str = String(value).replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const downloadCSV = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (savedItems.length === 0) return;
+
+    const headers = [
+      "Component",
+      "Category",
+      "Description",
+      "Calculation",
+      "Unit Cost",
+      "Quantity",
+      "Total Cost",
+      "Currency",
+      "Time Frame",
+      "Expected Output",
     ];
-    
-    const csvContent = [headers.join(","), values.join(",")].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `workplan-item-${new Date().getTime()}.csv`;
-    a.click();
+
+    const rows = savedItems.map((item) => [
+      escapeCsvCell(item.componentName),
+      escapeCsvCell(getCategoryLabel(item.budgetCategory)),
+      escapeCsvCell(item.description),
+      escapeCsvCell(item.detailedCalculation),
+      escapeCsvCell(item.unitCost || "0"),
+      escapeCsvCell(item.quantity || "0"),
+      escapeCsvCell(item.totalCostEstimate || "0.00"),
+      escapeCsvCell(item.currency),
+      escapeCsvCell(item.timeFrame),
+      escapeCsvCell(item.expectedOutput),
+    ]);
+
+    const csvString = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+
+    const blob = new Blob(["\ufeff" + csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `workplan-export-${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    setForm((prev) => {
+      const updated = { ...prev, [name]: value };
+
+      if (name === "unitCost" || name === "quantity") {
+        const unit = parseFloat(name === "unitCost" ? value : String(prev.unitCost)) || 0;
+        const qty = parseFloat(name === "quantity" ? value : String(prev.quantity)) || 0;
+        updated.totalCostEstimate = (unit * qty).toFixed(2);
+      }
+
+      return updated;
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSaveAndAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
 
-    // Defensive payload construction
     const payload = {
       componentName: form.componentName || COMPONENTS[0],
       budgetCategory: form.budgetCategory || BUDGET_CATEGORIES[0].value,
       description: form.description,
       detailedCalculation: form.detailedCalculation,
-      totalCostEstimate: parseFloat(form.totalCostEstimate) || 0,
+      unitCost: parseFloat(String(form.unitCost)) || 0,
+      quantity: parseFloat(String(form.quantity)) || 0,
+      totalCostEstimate: parseFloat(String(form.totalCostEstimate)) || 0,
       currency: form.currency || "USD",
       timeFrame: form.timeFrame,
       expectedOutput: form.expectedOutput,
     };
 
-    const wordCount = payload.description.trim().split(/\s+/).filter(Boolean).length;
-    if (wordCount > 300) {
-      setErrorMsg("Description cannot exceed 300 words.");
-      setLoading(false);
-      return;
-    }
-
     try {
       const res = await createWorkPlanItem(payload);
 
       if (res.success) {
-        setSuccessMsg("Workplan and budget item successfully uploaded to Supabase database!");
+        const newItem: SavedWorkPlanItem = {
+          ...form,
+          id: res.data?.id || Date.now().toString(),
+        };
+
+        setSavedItems((prev) => [...prev, newItem]);
+        setSuccessMsg("Item saved to database and added to workplan!");
+
         setForm({
           componentName: COMPONENTS[0],
           budgetCategory: BUDGET_CATEGORIES[0].value,
           description: "",
           detailedCalculation: "",
-          totalCostEstimate: "",
+          unitCost: "",
+          quantity: "",
+          totalCostEstimate: "0.00",
           currency: "USD",
           timeFrame: "",
           expectedOutput: "",
         });
       } else {
-        setErrorMsg(res.error || "Failed to save item.");
+        setErrorMsg(res.error || "Failed to save item to database.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "An unexpected error occurred.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-8 flex justify-between items-end">
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <PlusCircle className="text-[#16a34a] w-7 h-7" /> Upload Workplan and Budget
@@ -124,30 +239,32 @@ export default function UploadWorkPlanPage() {
             Capture project activities, financial estimates, and expected outcomes mapped across the 5 core project components.
           </p>
         </div>
-        <button 
+        <button
           type="button"
           onClick={downloadCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition cursor-pointer"
+          disabled={fetching || savedItems.length === 0}
+          className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-sm font-semibold rounded-xl transition cursor-pointer border border-slate-700"
         >
-          <Download className="w-4 h-4" /> Export Draft
+          <Download className="w-4 h-4 text-emerald-400" /> Export Workplan ({savedItems.length})
         </button>
       </div>
 
       {successMsg && (
-        <div className="mb-6 p-4 bg-[#16a34a]/10 border border-[#16a34a]/30 text-[#16a34a] rounded-xl flex items-center gap-3">
+        <div className="p-4 bg-[#16a34a]/10 border border-[#16a34a]/30 text-[#16a34a] rounded-xl flex items-center gap-3">
           <CheckCircle2 className="w-5 h-5 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl flex items-center gap-3">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl flex items-center gap-3">
           <ShieldAlert className="w-5 h-5 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
+      {/* Form Input */}
+      <form onSubmit={handleSaveAndAdd} className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-2">Column I: Project Component *</label>
           <select
@@ -204,18 +321,45 @@ export default function UploadWorkPlanPage() {
           />
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Unit Cost / Rate *</label>
+            <input
+              type="number"
+              step="0.01"
+              name="unitCost"
+              value={form.unitCost}
+              onChange={handleChange}
+              placeholder="e.g. 150.00"
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Quantity *</label>
+            <input
+              type="number"
+              step="1"
+              name="quantity"
+              value={form.quantity}
+              onChange={handleChange}
+              placeholder="e.g. 10"
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
+              required
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-slate-300 mb-2">Column V: Total Cost Estimate *</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Column V: Total Cost Estimate (Unit x Quantity) *</label>
             <input
               type="number"
               step="0.01"
               name="totalCostEstimate"
               value={form.totalCostEstimate}
-              onChange={handleChange}
-              placeholder="0.00"
-              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
-              required
+              readOnly
+              className="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-emerald-400 font-bold focus:outline-none cursor-not-allowed"
             />
           </div>
           <div>
@@ -262,17 +406,76 @@ export default function UploadWorkPlanPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-4 bg-[#16a34a] hover:bg-[#15803d] text-white font-semibold rounded-xl transition duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#16a34a]/20"
+          className="w-full py-4 bg-[#16a34a] hover:bg-[#15803d] text-white font-semibold rounded-xl transition duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#16a34a]/20 disabled:opacity-50"
         >
           {loading ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" /> Saving Workplan Item...
+              <Loader2 className="w-5 h-5 animate-spin" /> Saving Item...
             </>
           ) : (
-            "Save Workplan & Budget Item"
+            <>
+              <PlusCircle className="w-5 h-5" /> Save Item to Workplan
+            </>
           )}
         </button>
       </form>
+
+      {/* Live Table Preview of Saved Items */}
+      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-emerald-400" /> Saved Workplan Entries ({savedItems.length})
+          </h2>
+          <div className="flex items-center gap-2">
+            {fetching ? (
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" /> Fetching latest...
+              </span>
+            ) : (
+              <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1">
+                <Check className="w-3 h-3" /> Synced
+              </span>
+            )}
+          </div>
+        </div>
+
+        {fetching ? (
+          <div className="py-8 text-center text-slate-500 text-xs flex justify-center items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> Loading workplan items...
+          </div>
+        ) : savedItems.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 text-xs">
+            No workplan entries found yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="border-b border-slate-800 text-slate-400 uppercase">
+                <tr>
+                  <th className="pb-3 px-2">Component</th>
+                  <th className="pb-3 px-2">Category</th>
+                  <th className="pb-3 px-2">Description</th>
+                  <th className="pb-3 px-2">Time Frame</th>
+                  <th className="pb-3 px-2">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {savedItems.map((item) => (
+                  <tr key={item.id}>
+                    <td className="py-3 px-2 font-medium text-white">{item.componentName}</td>
+                    <td className="py-3 px-2">{getCategoryLabel(item.budgetCategory)}</td>
+                    <td className="py-3 px-2 truncate max-w-xs">{item.description}</td>
+                    <td className="py-3 px-2 text-slate-400">{item.timeFrame}</td>
+                    <td className="py-3 px-2 font-mono text-emerald-400">
+                      {formatCurrency(item.totalCostEstimate, item.currency)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
