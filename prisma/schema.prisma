@@ -58,7 +58,7 @@ model Farmer {
   userGroup              String
   nameOfChosenEnterprise String
   typeOfEnterprise       String
-  estimatedAnnualIncome Float
+  estimatedAnnualIncome  Float
   phoneNumber            String
   photoUrl               String?
 
@@ -108,12 +108,31 @@ model AdminReportComment {
 }
 
 // ==========================================
+// WorkPlan Category Model
+// ==========================================
+model Category {
+  id        String     @id @default(uuid())
+  name      String     @unique // e.g. "CIVIL_WORKS", "PERSONNEL", "CONSULTANCY", etc.
+  code      String?    @unique // Optional short code if needed
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  workPlans WorkPlan[]
+}
+
+// ==========================================
 // 1. First Table: WorkPlan & Budget Uploads
 // ==========================================
 model WorkPlan {
   id                  String   @id @default(uuid())
   componentName       String   // e.g. "Component 1: Capacity building"
-  budgetCategory      String   // CIVIL_WORKS, PERSONNEL, CONSULTANCY, GOODS_EQUIPMENT, TRAINING_TRAVELS
+  
+  // Relational link to the Category table
+  categoryId          String?
+  category            Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  budgetCategory      String?  // Kept as optional string fallback for uploaded raw values
+
   description         String   @db.Text // Max 300 words description
   detailedCalculation String   @db.Text // Calculation details text
   unitCost            Float    @default(0.0) // Cost per unit
