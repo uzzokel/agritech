@@ -202,7 +202,7 @@ export default function UploadWorkPlanPage() {
           id: res.data?.id || Date.now().toString(),
         };
 
-        setSavedItems((prev) => [...prev, newItem]);
+        setSavedItems((prev) => [newItem, ...prev]);
         setSuccessMsg("Item saved to database and added to workplan!");
 
         setForm({
@@ -420,7 +420,7 @@ export default function UploadWorkPlanPage() {
         </button>
       </form>
 
-      {/* Live Table Preview of Saved Items */}
+      {/* Live Table Preview of Saved Items with Fixed Max Height */}
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
@@ -448,9 +448,9 @@ export default function UploadWorkPlanPage() {
             No workplan entries found yet.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-80 overflow-y-auto overflow-x-auto rounded-lg pr-1">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="border-b border-slate-800 text-slate-400 uppercase">
+              <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 uppercase z-10">
                 <tr>
                   <th className="pb-3 px-2">Component</th>
                   <th className="pb-3 px-2">Category</th>
@@ -461,7 +461,7 @@ export default function UploadWorkPlanPage() {
               </thead>
               <tbody className="divide-y divide-slate-800/50">
                 {savedItems.map((item) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} className="hover:bg-slate-800/30 transition">
                     <td className="py-3 px-2 font-medium text-white">{item.componentName}</td>
                     <td className="py-3 px-2">{getCategoryLabel(item.budgetCategory)}</td>
                     <td className="py-3 px-2 truncate max-w-xs">{item.description}</td>
