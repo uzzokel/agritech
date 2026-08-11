@@ -11,7 +11,7 @@ export default async function FeaturesLayout({
   await requireAgriUser(); // Secure entire /features route group
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex">
+    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex py-30">
       {/* Sidebar Navigation */}
       <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col p-6 shrink-0">
         <div className="flex items-center gap-3 mb-8 px-2">

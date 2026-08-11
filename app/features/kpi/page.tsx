@@ -145,25 +145,20 @@ export default function KPITrackingPage() {
     }
   };
 
-  const computeRAG = (targetPct: number, baseline: number, actual: number) => {
-    // Prevent division by zero if target equals baseline
+  const computeProgress = (targetPct: number, baseline: number, actual: number) => {
     if (targetPct === baseline) {
-      return actual >= targetPct
-        ? { text: "GREEN", cls: "bg-[#16a34a]/20 text-[#16a34a] border-[#16a34a]/30" }
-        : { text: "RED", cls: "bg-red-500/20 text-red-400 border-red-500/30" };
+      return actual >= targetPct ? 100 : 0;
     }
+    return ((actual - baseline) / (targetPct - baseline)) * 100;
+  };
 
-    const progress = ((actual - baseline) / (targetPct - baseline)) * 100;
-
-    // Overperforming or achieved target fully
+  const computeRAG = (progress: number) => {
     if (progress >= 80) {
       return { text: "GREEN", cls: "bg-[#16a34a]/20 text-[#16a34a] border-[#16a34a]/30" };
     }
-    // Moderate progress (50% - 79%)
     if (progress >= 50) {
       return { text: "AMBER", cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" };
     }
-    // Critical lag (<50%)
     return { text: "RED", cls: "bg-red-500/20 text-red-400 border-red-500/30" };
   };
 
@@ -465,6 +460,7 @@ export default function KPITrackingPage() {
                     <th className="p-3">Baseline</th>
                     <th className="p-3">Target</th>
                     <th className="p-3">Actual Achieved (%)</th>
+                    <th className="p-3">Progress (%)</th>
                     <th className="p-3">Dynamic Flag</th>
                     <th className="p-3">Remarks / Narration</th>
                     <th className="p-3">Action</th>
@@ -473,7 +469,7 @@ export default function KPITrackingPage() {
                 <tbody className="divide-y divide-slate-800">
                   {monitoringData.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-slate-500">
+                      <td colSpan={8} className="text-center py-8 text-slate-500">
                         No indicators registered yet. Please add target indicators first.
                       </td>
                     </tr>
@@ -482,15 +478,19 @@ export default function KPITrackingPage() {
                       const currentActualStr =
                         actualsInput[item.id]?.actualValue ?? "";
                       const currentActualNum = parseFloat(currentActualStr);
-                      const flag =
-                        currentActualStr !== "" && !isNaN(currentActualNum)
-                          ? computeRAG(
-                              item.targetPercentage,
-                              item.baselineValue,
-                              currentActualNum
-                            )
-                          : null;
 
+                      const hasValidActual =
+                        currentActualStr !== "" && !isNaN(currentActualNum);
+
+                      const progressVal = hasValidActual
+                        ? computeProgress(
+                            item.targetPercentage,
+                            item.baselineValue,
+                            currentActualNum
+                          )
+                        : null;
+
+                      const flag = progressVal !== null ? computeRAG(progressVal) : null;
                       const isSaving = savingId === item.id;
 
                       return (
@@ -527,6 +527,14 @@ export default function KPITrackingPage() {
                               }
                               className="w-24 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs focus:outline-none focus:border-[#16a34a]"
                             />
+                          </td>
+                          {/* Computed Progress Column */}
+                          <td className="p-3 font-mono font-bold text-slate-200">
+                            {progressVal !== null ? (
+                              `${progressVal.toFixed(1)}%`
+                            ) : (
+                              <span className="text-slate-600">—</span>
+                            )}
                           </td>
                           <td className="p-3">
                             {flag ? (
