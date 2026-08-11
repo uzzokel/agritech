@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   createPerformanceTarget,
   getPerformanceTargets,
@@ -14,6 +16,7 @@ import {
   PlusCircle,
   Target,
   TrendingUp,
+  Download,
 } from "lucide-react";
 
 const COMPONENTS = [
@@ -190,15 +193,106 @@ export default function KPITrackingPage() {
     }
   };
 
+  // Export PDF Handler
+  const exportToPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape" });
+
+    if (activeSubTab === "targets") {
+      doc.setFontSize(16);
+      doc.text("KPI Planning & Target Report", 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
+
+      const tableHeaders = [
+        ["Component", "Expected Outcome", "Baseline", "Target", "Means of Verification", "Timeframe", "Responsible"],
+      ];
+
+      const tableData = targets.map((t) => [
+        t.componentName,
+        t.expectedOutcomes,
+        `${t.baselineValue}%`,
+        `${t.targetPercentage}%`,
+        t.meansOfVerification,
+        t.timeFrame,
+        t.responsiblePerson,
+      ]);
+
+      autoTable(doc, {
+        head: tableHeaders,
+        body: tableData,
+        startY: 28,
+        theme: "grid",
+        headStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255] },
+        styles: { fontSize: 8 },
+      });
+
+      doc.save("KPI_Targets_Report.pdf");
+    } else {
+      doc.setFontSize(16);
+      doc.text("KPI Performance & Progress Report", 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
+
+      const tableHeaders = [
+        ["Component / Indicator", "Baseline", "Target", "Actual (%)", "Progress (%)", "RAG Flag", "Remarks"],
+      ];
+
+      const tableData = monitoringData.map((item) => {
+        const currentActualStr = actualsInput[item.id]?.actualValue ?? "";
+        const currentActualNum = parseFloat(currentActualStr);
+        const hasValidActual = currentActualStr !== "" && !isNaN(currentActualNum);
+
+        const progressVal = hasValidActual
+          ? computeProgress(item.targetPercentage, item.baselineValue, currentActualNum)
+          : null;
+
+        const flag = progressVal !== null ? computeRAG(progressVal) : null;
+
+        return [
+          `${item.componentName}\n${item.expectedOutcomes}`,
+          `${item.baselineValue}%`,
+          `${item.targetPercentage}%`,
+          hasValidActual ? `${currentActualNum}%` : "—",
+          progressVal !== null ? `${progressVal.toFixed(1)}%` : "—",
+          flag ? flag.text : "—",
+          actualsInput[item.id]?.remarks || "—",
+        ];
+      });
+
+      autoTable(doc, {
+        head: tableHeaders,
+        body: tableData,
+        startY: 28,
+        theme: "grid",
+        headStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255] },
+        styles: { fontSize: 8 },
+      });
+
+      doc.save("KPI_Progress_Report.pdf");
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <Target className="text-[#16a34a] w-7 h-7" /> Key Performance Indicators (KPI)
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Manage targets and record real-time monitoring progress for core components.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <Target className="text-[#16a34a] w-7 h-7" /> Key Performance Indicators (KPI)
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Manage targets and record real-time monitoring progress for core components.
+          </p>
+        </div>
+
+        {/* Download PDF Button */}
+        <button
+          type="button"
+          onClick={exportToPDF}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg.slate-800 hover:bg-slate-700 text-white text-sm font-medium border border-slate-700 rounded-xl transition cursor-pointer self-start sm:self-auto"
+        >
+          <Download className="w-4 h-4 text-[#16a34a]" />
+          Export to PDF
+        </button>
       </div>
 
       {/* Sub-tabs */}
