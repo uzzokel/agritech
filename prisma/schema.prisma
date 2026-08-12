@@ -218,3 +218,18 @@ model Risk {
   timestamp        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
+
+// ==========================================
+// 6. Lessons Learned Documentation Model
+// ==========================================
+model LessonLearned {
+  id                       String   @id @default(uuid())
+  component                String   // Dropdown selection (e.g., Capacity Building, Agribusiness Investment, etc.)
+  whatWentWrong            String   @db.Text
+  rootCauseAnalysis        String   @db.Text
+  impact                   String   @db.Text
+  actionableRecommendation String   @db.Text
+  actionOwner              String
+  timestamp                DateTime @default(now()) // Explicit Timestamp field
+  updatedAt                DateTime @updatedAt
+}

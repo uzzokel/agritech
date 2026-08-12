@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Target,
   AlertTriangle,
+  BookOpen,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -36,6 +37,11 @@ const NAV_ITEMS = [
     label: "Risk Monitoring",
     icon: AlertTriangle,
   },
+  {
+    href: "/features/lessons-learned",
+    label: "Lessons Learned",
+    icon: BookOpen,
+  },
 ];
 
 export function NavLinks() {
@@ -45,7 +51,7 @@ export function NavLinks() {
     <nav className="space-y-2 flex-1">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
-        
+
         // Match exact route for root, or startsWith for sub-routes
         const isActive =
           item.href === "/features"
