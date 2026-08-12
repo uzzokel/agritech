@@ -1,4 +1,3 @@
-// app/features/NavLinks.tsx
 "use client";
 
 import Link from "next/link";
@@ -8,6 +7,7 @@ import {
   BarChart3,
   TrendingUp,
   Target,
+  AlertTriangle,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -30,6 +30,11 @@ const NAV_ITEMS = [
     href: "/features/kpi",
     label: "KPI Targets & Tracking",
     icon: Target,
+  },
+  {
+    href: "/features/risks",
+    label: "Risk Monitoring",
+    icon: AlertTriangle,
   },
 ];
 
