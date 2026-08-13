@@ -17,6 +17,19 @@ enum Status {
   DENIED
 }
 
+enum BlogCategory {
+  FIELD_INSIGHTS
+  ADVISORIES
+  POLICY_BRIEFS
+  TECH_UPDATES
+  MARKET_INSIGHTS
+
+  // Legacy variants retained for database compatibility
+  POLICY
+  TECH
+  MARKET
+}
+
 model User {
   id            String   @id @default(uuid())
   clerkUserId   String?  @unique
@@ -58,7 +71,7 @@ model Farmer {
   userGroup              String
   nameOfChosenEnterprise String
   typeOfEnterprise       String
-  estimatedAnnualIncome  Float
+  estimatedAnnualIncome Float
   phoneNumber            String
   photoUrl               String?
 
@@ -232,4 +245,38 @@ model LessonLearned {
   actionOwner              String
   timestamp                DateTime @default(now()) // Explicit Timestamp field
   updatedAt                DateTime @updatedAt
+}
+
+// ==========================================
+// 7. Blog & Knowledge Portal Models
+// ==========================================
+model BlogPost {
+  id          String       @id @default(cuid())
+  title       String
+  slug        String       @unique
+  excerpt     String       @db.Text
+  content     String       @db.Text
+  category    BlogCategory @default(FIELD_INSIGHTS)
+  authorName  String
+  authorRole  String?
+  location    String?
+  tag         String?      @default("Case Study")
+  imageUrl    String?      // 👈 Added featured image URL field
+  likes       Int          @default(0)
+  published   Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([postId])
 }
