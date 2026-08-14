@@ -194,21 +194,20 @@ export async function deleteAdvisoryQuery(queryId: string): Promise<ActionResult
 }
 
 /**
- * Posts a new agricultural regional alert to Prisma
+ * Posts a new agricultural alert to Prisma
  */
 export async function postAgriAlert(alertData: {
   title: string;
   severity: string;
-  region: string;
-  message: string;
+  content: string;
 }): Promise<ActionResult> {
   try {
     const newAlert = await prisma.agriculturalAlert.create({
       data: {
         title: alertData.title,
         severity: alertData.severity as any,
-        message: alertData.message,
-        ...( { region: alertData.region } as any ),
+        content: alertData.content,
+        category: "WEATHER",
       },
     });
 

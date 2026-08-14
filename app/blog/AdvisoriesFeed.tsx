@@ -42,7 +42,7 @@ export default function AdvisoriesFeed({ initialAlerts = [], initialQueries = []
       title: formData.get("title") as string,
       severity: formData.get("severity") as string || "INFO",
       region: formData.get("region") as string || "National",
-      message: formData.get("message") as string,
+      content: formData.get("message") as string, // 👈 Updated from message to content
     };
 
     startTransition(async () => {
