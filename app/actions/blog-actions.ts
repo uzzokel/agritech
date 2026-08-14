@@ -1,24 +1,60 @@
 "use server";
 
+import { prisma } from "@/lib/prisma";
+import { BlogCategory } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 
+// Initialized solely for handling image uploads to Supabase Storage
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 /**
+ * Normalizes raw category keys (e.g., "insights", "field-insights")
+ * to match valid Prisma BlogCategory Enum values.
+ */
+function formatCategoryEnum(categoryKey: string): BlogCategory {
+  if (!categoryKey) return BlogCategory.FIELD_INSIGHTS;
+
+  const normalized = categoryKey.trim().toUpperCase().replace(/-/g, "_");
+
+  // Lookup table for UI keys, slugs, and legacy values
+  const categoryMap: Record<string, BlogCategory> = {
+    // Current Active Menu Items
+    FIELD_INSIGHTS: BlogCategory.FIELD_INSIGHTS,
+    ADVISORIES: BlogCategory.ADVISORIES,
+    POLICY_BRIEFS: BlogCategory.POLICY_BRIEFS,
+    TECH_UPDATES: BlogCategory.TECH_UPDATES,
+    MARKET_INSIGHTS: BlogCategory.MARKET_INSIGHTS,
+
+    // Slugs / UI Shortcuts
+    INSIGHTS: BlogCategory.FIELD_INSIGHTS,
+    POLICY: BlogCategory.POLICY,
+    TECH: BlogCategory.TECH,
+    MARKET: BlogCategory.MARKET,
+  };
+
+  return categoryMap[normalized] || BlogCategory.FIELD_INSIGHTS;
+}
+
+/**
  * Fetch all published blog posts
  */
 export async function getAllBlogPosts() {
   try {
-    const { data, error } = await supabase
-      .from("blog_posts")
-      .select("*, comments:blog_comments(count)")
-      .order("created_at", { ascending: false });
+    const data = await prisma.blogPost.findMany({
+      include: {
+        _count: {
+          select: { comments: true },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-    if (error) throw error;
     return { success: true, data };
   } catch (error: any) {
     console.error("Error fetching blog posts:", error);
@@ -31,20 +67,22 @@ export async function getAllBlogPosts() {
  */
 export async function getBlogPostsByCategory(categoryKey: string, limit?: number) {
   try {
-    let query = supabase
-      .from("blog_posts")
-      .select("*, comments:blog_comments(count)")
-      .eq("category_key", categoryKey)
-      .order("created_at", { ascending: false });
+    const data = await prisma.blogPost.findMany({
+      where: {
+        category: formatCategoryEnum(categoryKey),
+      },
+      take: limit || undefined,
+      include: {
+        _count: {
+          select: { comments: true },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-    if (limit) {
-      query = query.limit(limit);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-    return { success: true, data: data || [] };
+    return { success: true, data };
   } catch (error: any) {
     console.error(`Error fetching posts for category ${categoryKey}:`, error);
     return { success: false, error: error.message, data: [] };
@@ -56,13 +94,15 @@ export async function getBlogPostsByCategory(categoryKey: string, limit?: number
  */
 export async function getBlogPostBySlug(slug: string) {
   try {
-    const { data, error } = await supabase
-      .from("blog_posts")
-      .select("*, comments:blog_comments(*)")
-      .eq("slug", slug)
-      .single();
+    const data = await prisma.blogPost.findUnique({
+      where: { slug },
+      include: {
+        comments: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
 
-    if (error) throw error;
     return { success: true, data };
   } catch (error: any) {
     console.error(`Error fetching post with slug ${slug}:`, error);
@@ -70,6 +110,9 @@ export async function getBlogPostBySlug(slug: string) {
   }
 }
 
+/**
+ * Save or update a blog post
+ */
 export async function saveBlogPost(formDataPayload: FormData) {
   try {
     const id = formDataPayload.get("id") as string | null;
@@ -85,13 +128,13 @@ export async function saveBlogPost(formDataPayload: FormData) {
 
     const file = formDataPayload.get("image") as File | null;
 
-    // Generate slug from title if creating a new post or missing slug
+    // Generate slug from title
     const slug = title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)+/g, "");
 
-    // Upload image to Supabase Storage bucket 'blog-images' if a file was selected
+    // Upload image to Supabase Storage bucket 'blog-images' if a new file was provided
     if (file && file.size > 0) {
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -106,7 +149,7 @@ export async function saveBlogPost(formDataPayload: FormData) {
         return { success: false, error: "Image upload failed." };
       }
 
-      // Get Public URL for uploaded image
+      // Get public URL for uploaded image
       const { data: publicUrlData } = supabase.storage
         .from("blog-images")
         .getPublicUrl(filePath);
@@ -119,23 +162,23 @@ export async function saveBlogPost(formDataPayload: FormData) {
       slug,
       excerpt,
       content,
-      author_name: authorName,
-      author_role: authorRole,
+      authorName,
+      authorRole,
       location,
       tag,
-      category_key: categoryKey,
-      image_url: imageUrl,
+      category: formatCategoryEnum(categoryKey),
+      imageUrl,
     };
 
     if (id) {
-      const { error } = await supabase
-        .from("blog_posts")
-        .update(postData)
-        .eq("id", id);
-      if (error) throw error;
+      await prisma.blogPost.update({
+        where: { id },
+        data: postData,
+      });
     } else {
-      const { error } = await supabase.from("blog_posts").insert([postData]);
-      if (error) throw error;
+      await prisma.blogPost.create({
+        data: postData,
+      });
     }
 
     revalidatePath("/blog");
@@ -146,43 +189,62 @@ export async function saveBlogPost(formDataPayload: FormData) {
   }
 }
 
+/**
+ * Delete a blog post
+ */
 export async function deleteBlogPost(id: string) {
-  const { error } = await supabase.from("blog_posts").delete().eq("id", id);
-  if (!error) revalidatePath("/blog");
-  return { success: !error };
-}
-
-export async function likeBlogPost(id: string) {
-  const { data: post } = await supabase
-    .from("blog_posts")
-    .select("likes")
-    .eq("id", id)
-    .single();
-
-  if (post) {
-    await supabase
-      .from("blog_posts")
-      .update({ likes: (post.likes || 0) + 1 })
-      .eq("id", id);
+  try {
+    await prisma.blogPost.delete({
+      where: { id },
+    });
+    revalidatePath("/blog");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    return { success: false };
   }
 }
 
+/**
+ * Increment post likes
+ */
+export async function likeBlogPost(id: string) {
+  try {
+    await prisma.blogPost.update({
+      where: { id },
+      data: {
+        likes: { increment: 1 },
+      },
+    });
+  } catch (error) {
+    console.error("Error liking post:", error);
+  }
+}
+
+/**
+ * Add a comment to a blog post
+ */
 export async function addComment(postId: string, author: string, content: string) {
-  const { data, error } = await supabase
-    .from("blog_comments")
-    .insert([{ post_id: postId, author, content }])
-    .select()
-    .single();
+  try {
+    const newComment = await prisma.comment.create({
+      data: {
+        postId,
+        author,
+        content,
+      },
+    });
 
-  if (error) return { success: false };
-
-  return {
-    success: true,
-    comment: {
-      id: data.id,
-      author: data.author,
-      content: data.content,
-      createdAt: new Date(data.created_at),
-    },
-  };
+    return {
+      success: true,
+      comment: {
+        id: newComment.id,
+        author: newComment.author,
+        content: newComment.content,
+        createdAt: newComment.createdAt,
+      },
+    };
+  } catch (error) {
+    console.error("Error adding comment:", error);
+    return { success: false };
+  }
 }

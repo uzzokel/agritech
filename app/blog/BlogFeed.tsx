@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useTransition } from "react";
 import {
   saveBlogPost,
   deleteBlogPost,
@@ -19,8 +19,9 @@ import {
   Send,
   X,
   Sparkles,
-  Image as ImageIcon,
   Upload,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 type CommentType = {
@@ -36,34 +37,47 @@ export type PostType = {
   excerpt: string;
   content: string;
   authorName: string;
+  authorId?: string | null;
   authorRole: string | null;
   location: string | null;
   tag: string | null;
-  imageUrl?: string | null; // 👈 Added image URL support
+  imageUrl?: string | null;
   likes: number;
   createdAt: Date;
   comments: CommentType[];
 };
 
+const POSTS_PER_PAGE = 6; // Max posts per page
+
 export function BlogFeed({
-  initialPosts,
+  initialPosts = [],
   categoryKey,
   categoryLabel,
+  currentUserId,
+  isAdmin = false, // Pass true if logged in user is admin
 }: {
-  initialPosts: PostType[];
+  initialPosts?: PostType[];
   categoryKey: string;
   categoryLabel: string;
+  currentUserId?: string;
+  isAdmin?: boolean;
 }) {
-  const [posts, setPosts] = useState<PostType[]>(initialPosts);
+  const safeInitialPosts = Array.isArray(initialPosts) ? initialPosts : [];
+  const [posts, setPosts] = useState<PostType[]>(safeInitialPosts);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setPosts(Array.isArray(initialPosts) ? initialPosts : []);
+    setCurrentPage(1);
+  }, [initialPosts]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PostType | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Image Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState({
     title: "",
     excerpt: "",
@@ -75,10 +89,16 @@ export function BlogFeed({
     imageUrl: "",
   });
 
-  // Comment Input state mapped per postId
   const [activeCommentBox, setActiveCommentBox] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [commentAuthor, setCommentAuthor] = useState("");
+
+  // Pagination Math
+  const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE);
+  const paginatedPosts = posts.slice(
+    (currentPage - 1) * POSTS_PER_PAGE,
+    currentPage * POSTS_PER_PAGE
+  );
 
   const handleOpenForm = (post?: PostType) => {
     if (post) {
@@ -112,7 +132,6 @@ export function BlogFeed({
     setIsModalOpen(true);
   };
 
-  // File Change & Preview Handler
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -130,7 +149,6 @@ export function BlogFeed({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
-      // Build FormData payload to support file upload via Server Actions
       const payload = new FormData();
       if (editingPost?.id) payload.append("id", editingPost.id);
       payload.append("title", formData.title);
@@ -151,7 +169,7 @@ export function BlogFeed({
 
       if (res.success) {
         setIsModalOpen(false);
-        window.location.reload(); // Refresh data feed
+        window.location.reload();
       } else {
         alert(res.error || "Failed to save blog post");
       }
@@ -160,14 +178,18 @@ export function BlogFeed({
 
   const handleDelete = (id: string) => {
     if (!confirm("Are you sure you want to delete this post?")) return;
+
     startTransition(async () => {
-      await deleteBlogPost(id);
+      const res = await deleteBlogPost(id);
+      if (res?.error) {
+        alert(res.error);
+        return;
+      }
       setPosts((prev) => prev.filter((p) => p.id !== id));
     });
   };
 
   const handleLike = async (id: string) => {
-    // Optimistic UI update
     setPosts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, likes: p.likes + 1 } : p))
     );
@@ -186,7 +208,7 @@ export function BlogFeed({
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId
-            ? { ...p, comments: [res.comment as CommentType, ...p.comments] }
+            ? { ...p, comments: [res.comment as CommentType, ...(p.comments || [])] }
             : p
         )
       );
@@ -219,176 +241,230 @@ export function BlogFeed({
       </div>
 
       {/* Posts Feed Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {posts.map((post) => (
-          <article
-            key={post.id}
-            className="bg-slate-900 rounded-2xl border border-slate-800 hover:border-[#16a34a]/40 transition-all flex flex-col justify-between group shadow-lg overflow-hidden"
-          >
-            {/* Post Image Banner (if available) */}
-            {post.imageUrl && (
-              <div className="w-full h-48 overflow-hidden bg-slate-950 relative">
-                <img
-                  src={post.imageUrl}
-                  alt={post.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-            )}
+      {posts.length === 0 ? (
+        <div className="p-12 text-center rounded-2xl bg-slate-900/50 border border-slate-800/80">
+          <p className="text-slate-400 font-medium text-sm">No field insights found in this category yet.</p>
+        </div>
+      ) : (
+        <>
+          {/* Note: items-start prevents tall comment cards from stretching sibling cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            {paginatedPosts.map((post) => {
+              const commentsList = post.comments || [];
+              
+              // Permission Check: Visible if user is explicit Admin OR owns authorId OR if authorId isn't set yet (fallback)
+              const canModify =
+                isAdmin ||
+                !post.authorId ||
+                (currentUserId && post.authorId === currentUserId);
 
-            <div className="p-6 flex-1 flex flex-col justify-between">
-              <div>
-                {/* Top Meta Bar */}
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-4">
-                  <span className="flex items-center gap-1 font-semibold px-2.5 py-1 rounded-md bg-[#16a34a]/10 text-[#16a34a] border border-[#16a34a]/20">
-                    <Tag size={12} />
-                    {post.tag || "Insight"}
-                  </span>
-
-                  {/* Edit & Delete Controls */}
-                  <div className="flex items-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleOpenForm(post)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                      title="Edit Post"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(post.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
-                      title="Delete Post"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Title & Excerpt */}
-                <h2 className="text-xl font-bold text-white group-hover:text-[#16a34a] transition-colors leading-snug mb-3">
-                  {post.title}
-                </h2>
-                <p className="text-sm text-slate-300 leading-relaxed mb-4">
-                  {post.excerpt}
-                </p>
-              </div>
-
-              {/* Author Footer & Social Engagement */}
-              <div className="pt-4 border-t border-slate-800/80 space-y-4">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <User size={14} className="text-[#16a34a]" />
-                    <span className="font-medium text-slate-200">
-                      {post.authorName} {post.authorRole ? `(${post.authorRole})` : ""}
-                    </span>
-                  </div>
-
-                  {post.location && (
-                    <div className="flex items-center gap-1 text-slate-400">
-                      <MapPin size={13} />
-                      <span>{post.location}</span>
+              return (
+                <article
+                  key={post.id}
+                  className="bg-slate-900 rounded-2xl border border-slate-800 hover:border-[#16a34a]/40 transition-all flex flex-col justify-between group shadow-lg overflow-hidden"
+                >
+                  {/* Post Image Banner */}
+                  {post.imageUrl && (
+                    <div className="w-full h-48 overflow-hidden bg-slate-950 relative">
+                      <img
+                        src={post.imageUrl}
+                        alt={post.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
                     </div>
                   )}
-                </div>
 
-                {/* Like & Comment Action Buttons */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
-                  <div className="flex items-center gap-4">
-                    {/* Like Button */}
-                    <button
-                      onClick={() => handleLike(post.id)}
-                      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-400 transition-colors group/like"
-                    >
-                      <Heart
-                        size={16}
-                        className={`transition-transform group-hover/like:scale-125 ${
-                          post.likes > 0 ? "fill-rose-500 text-rose-500" : ""
-                        }`}
-                      />
-                      <span className="font-semibold">{post.likes}</span>
-                    </button>
+                  <div className="p-6 flex-1 flex flex-col justify-between">
+                    <div>
+                      {/* Top Meta Bar */}
+                      <div className="flex items-center justify-between text-xs text-slate-400 mb-4">
+                        <span className="flex items-center gap-1 font-semibold px-2.5 py-1 rounded-md bg-[#16a34a]/10 text-[#16a34a] border border-[#16a34a]/20">
+                          <Tag size={12} />
+                          {post.tag || "Insight"}
+                        </span>
 
-                    {/* Comment Toggle */}
-                    <button
-                      onClick={() =>
-                        setActiveCommentBox(
-                          activeCommentBox === post.id ? null : post.id
-                        )
-                      }
-                      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#16a34a] transition-colors"
-                    >
-                      <MessageSquare size={16} />
-                      <span>{post.comments.length} Comments</span>
-                    </button>
-                  </div>
-
-                  <span className="text-[11px] text-slate-500">
-                    {new Date(post.createdAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-
-                {/* Expandable Comments Section */}
-                {activeCommentBox === post.id && (
-                  <div className="pt-3 space-y-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                    {/* Add Comment Input */}
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Your name..."
-                        value={commentAuthor}
-                        onChange={(e) => setCommentAuthor(e.target.value)}
-                        className="w-full text-xs px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-[#16a34a]"
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Write a response... 💬"
-                          value={commentText}
-                          onChange={(e) => setCommentText(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleAddComment(post.id)}
-                          className="flex-1 text-xs px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-[#16a34a]"
-                        />
-                        <button
-                          onClick={() => handleAddComment(post.id)}
-                          className="px-3 py-2 rounded-lg bg-[#16a34a] hover:bg-[#16a34a]/90 text-white text-xs font-semibold flex items-center gap-1"
-                        >
-                          <Send size={12} />
-                        </button>
+                        {/* Edit & Delete Controls */}
+                        {canModify && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOpenForm(post)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Edit Post"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(post.id)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Delete Post"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Title & Excerpt */}
+                      <h2 className="text-xl font-bold text-white group-hover:text-[#16a34a] transition-colors leading-snug mb-3">
+                        {post.title}
+                      </h2>
+                      <p className="text-sm text-slate-300 leading-relaxed mb-4">
+                        {post.excerpt}
+                      </p>
                     </div>
 
-                    {/* Comment Thread */}
-                    <div className="space-y-2 max-h-40 overflow-y-auto pt-2">
-                      {post.comments.map((comment) => (
-                        <div
-                          key={comment.id}
-                          className="text-xs bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80"
-                        >
-                          <span className="font-bold text-[#16a34a] block mb-0.5">
-                            {comment.author}
+                    {/* Author Footer & Social Engagement */}
+                    <div className="pt-4 border-t border-slate-800/80 space-y-4">
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <div className="flex items-center gap-2">
+                          <User size={14} className="text-[#16a34a]" />
+                          <span className="font-medium text-slate-200">
+                            {post.authorName} {post.authorRole ? `(${post.authorRole})` : ""}
                           </span>
-                          <p className="text-slate-300">{comment.content}</p>
                         </div>
-                      ))}
+
+                        {post.location && (
+                          <div className="flex items-center gap-1 text-slate-400">
+                            <MapPin size={13} />
+                            <span>{post.location}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Like & Comment Action Buttons */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => handleLike(post.id)}
+                            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-400 transition-colors group/like cursor-pointer"
+                          >
+                            <Heart
+                              size={16}
+                              className={`transition-transform group-hover/like:scale-125 ${
+                                post.likes > 0 ? "fill-rose-500 text-rose-500" : ""
+                              }`}
+                            />
+                            <span className="font-semibold">{post.likes}</span>
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              setActiveCommentBox(
+                                activeCommentBox === post.id ? null : post.id
+                              )
+                            }
+                            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#16a34a] transition-colors cursor-pointer"
+                          >
+                            <MessageSquare size={16} />
+                            <span>{commentsList.length} Comments</span>
+                          </button>
+                        </div>
+
+                        <span className="text-[11px] text-slate-500">
+                          {new Date(post.createdAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
+
+                      {/* Expandable Comments Section */}
+                      {activeCommentBox === post.id && (
+                        <div className="pt-3 space-y-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              placeholder="Your name..."
+                              value={commentAuthor}
+                              onChange={(e) => setCommentAuthor(e.target.value)}
+                              className="w-full text-xs px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-[#16a34a]"
+                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Write a response... 💬"
+                                value={commentText}
+                                onChange={(e) => setCommentText(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleAddComment(post.id)}
+                                className="flex-1 text-xs px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-[#16a34a]"
+                              />
+                              <button
+                                onClick={() => handleAddComment(post.id)}
+                                className="px-3 py-2 rounded-lg bg-[#16a34a] hover:bg-[#16a34a]/90 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Send size={12} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2 max-h-40 overflow-y-auto pt-2">
+                            {commentsList.map((comment) => (
+                              <div
+                                key={comment.id}
+                                className="text-xs bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80"
+                              >
+                                <span className="font-bold text-[#16a34a] block mb-0.5">
+                                  {comment.author}
+                                </span>
+                                <p className="text-slate-300">{comment.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Pagination Bar */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-6 border-t border-slate-800/80 text-sm text-slate-400">
+              <p className="text-xs">
+                Showing <span className="font-bold text-white">{(currentPage - 1) * POSTS_PER_PAGE + 1}</span> to{" "}
+                <span className="font-bold text-white">
+                  {Math.min(currentPage * POSTS_PER_PAGE, posts.length)}
+                </span>{" "}
+                of <span className="font-bold text-white">{posts.length}</span> field insights
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  className="flex items-center gap-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  <ChevronLeft size={16} />
+                  <span>Prev</span>
+                </button>
+
+                <span className="text-xs font-bold text-slate-300 px-2">
+                  {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                  className="flex items-center gap-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  <span>Next</span>
+                  <ChevronRight size={16} />
+                </button>
               </div>
             </div>
-          </article>
-        ))}
-      </div>
+          )}
+        </>
+      )}
 
-      {/* Creation / Edit Modal Overlay */}
+      {/* Creation / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 relative shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer"
             >
               <X size={20} />
             </button>
@@ -401,7 +477,6 @@ export function BlogFeed({
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 text-sm">
-              {/* Image Upload Area */}
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
                   Featured Image
@@ -416,7 +491,7 @@ export function BlogFeed({
                     <button
                       type="button"
                       onClick={removeSelectedImage}
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-950/80 text-slate-300 hover:text-white hover:bg-red-500 transition-colors"
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-950/80 text-slate-300 hover:text-white hover:bg-red-500 transition-colors cursor-pointer"
                     >
                       <X size={16} />
                     </button>

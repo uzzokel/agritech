@@ -1,6 +1,6 @@
 // app/blog/page.tsx
 import React from "react";
-import { getBlogPostsByCategory } from "@/app/actions/blog-actions";
+import { getAllBlogPosts, getBlogPostsByCategory } from "@/app/actions/blog-actions";
 import { BlogFeed } from "./BlogFeed";
 
 type PageProps = {
@@ -9,10 +9,16 @@ type PageProps = {
 
 export default async function BlogPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams;
-  const currentCategoryKey = resolvedParams.category || "insights";
+  const currentCategoryKey = resolvedParams.category || "all";
 
-  const response = await getBlogPostsByCategory(currentCategoryKey);
-  const posts = response.data || [];
+  // Fetch all posts when default/all, or filter by specific category
+  const response =
+    currentCategoryKey === "all"
+      ? await getAllBlogPosts()
+      : await getBlogPostsByCategory(currentCategoryKey);
+
+  // Safely extract posts array with guaranteed fallback
+  const posts = response?.success && Array.isArray(response.data) ? response.data : [];
 
   return (
     <BlogFeed
