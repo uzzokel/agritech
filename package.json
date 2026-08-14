@@ -10,9 +10,12 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.18",
+    "@google/genai": "^2.17.1",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@supabase/supabase-js": "^2.110.8",
+    "@tavily/core": "^0.7.7",
     "formik": "^2.4.9",
     "html-to-image": "^1.11.13",
     "jspdf": "^4.2.1",
@@ -45,6 +48,6 @@
     "typescript": "^5"
   },
   "prisma": {
-  "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
-}
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  }
 }

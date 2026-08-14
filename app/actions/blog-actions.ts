@@ -12,6 +12,15 @@ const supabase = createClient(
 );
 
 /**
+ * Shared action result interface to fix TypeScript property access errors (e.g. `res.error`)
+ */
+export type ActionResult<T = unknown> = {
+  success: boolean;
+  error?: string;
+  data?: T;
+};
+
+/**
  * Normalizes raw category keys (e.g., "insights", "field-insights")
  * to match valid Prisma BlogCategory Enum values.
  */
@@ -31,9 +40,9 @@ function formatCategoryEnum(categoryKey: string): BlogCategory {
 
     // Slugs / UI Shortcuts
     INSIGHTS: BlogCategory.FIELD_INSIGHTS,
-    POLICY: BlogCategory.POLICY,
-    TECH: BlogCategory.TECH,
-    MARKET: BlogCategory.MARKET,
+    POLICY: BlogCategory.POLICY_BRIEFS,
+    TECH: BlogCategory.TECH_UPDATES,
+    MARKET: BlogCategory.MARKET_INSIGHTS,
   };
 
   return categoryMap[normalized] || BlogCategory.FIELD_INSIGHTS;
@@ -42,7 +51,7 @@ function formatCategoryEnum(categoryKey: string): BlogCategory {
 /**
  * Fetch all published blog posts
  */
-export async function getAllBlogPosts() {
+export async function getAllBlogPosts(): Promise<ActionResult<any[]>> {
   try {
     const data = await prisma.blogPost.findMany({
       include: {
@@ -65,7 +74,10 @@ export async function getAllBlogPosts() {
 /**
  * Fetch blog posts filtered by category
  */
-export async function getBlogPostsByCategory(categoryKey: string, limit?: number) {
+export async function getBlogPostsByCategory(
+  categoryKey: string,
+  limit?: number
+): Promise<ActionResult<any[]>> {
   try {
     const data = await prisma.blogPost.findMany({
       where: {
@@ -92,7 +104,7 @@ export async function getBlogPostsByCategory(categoryKey: string, limit?: number
 /**
  * Fetch a single blog post by its slug
  */
-export async function getBlogPostBySlug(slug: string) {
+export async function getBlogPostBySlug(slug: string): Promise<ActionResult<any>> {
   try {
     const data = await prisma.blogPost.findUnique({
       where: { slug },
@@ -113,7 +125,7 @@ export async function getBlogPostBySlug(slug: string) {
 /**
  * Save or update a blog post
  */
-export async function saveBlogPost(formDataPayload: FormData) {
+export async function saveBlogPost(formDataPayload: FormData): Promise<ActionResult> {
   try {
     const id = formDataPayload.get("id") as string | null;
     const title = formDataPayload.get("title") as string;
@@ -192,23 +204,26 @@ export async function saveBlogPost(formDataPayload: FormData) {
 /**
  * Delete a blog post
  */
-export async function deleteBlogPost(id: string) {
+export async function deleteBlogPost(id: string): Promise<ActionResult> {
   try {
     await prisma.blogPost.delete({
       where: { id },
     });
     revalidatePath("/blog");
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting post:", error);
-    return { success: false };
+    return {
+      success: false,
+      error: error?.message || "Failed to delete post",
+    };
   }
 }
 
 /**
  * Increment post likes
  */
-export async function likeBlogPost(id: string) {
+export async function likeBlogPost(id: string): Promise<ActionResult> {
   try {
     await prisma.blogPost.update({
       where: { id },
@@ -216,15 +231,21 @@ export async function likeBlogPost(id: string) {
         likes: { increment: 1 },
       },
     });
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
     console.error("Error liking post:", error);
+    return { success: false, error: error?.message || "Failed to like post" };
   }
 }
 
 /**
  * Add a comment to a blog post
  */
-export async function addComment(postId: string, author: string, content: string) {
+export async function addComment(
+  postId: string,
+  author: string,
+  content: string
+): Promise<ActionResult<any>> {
   try {
     const newComment = await prisma.comment.create({
       data: {
@@ -236,15 +257,15 @@ export async function addComment(postId: string, author: string, content: string
 
     return {
       success: true,
-      comment: {
+      data: {
         id: newComment.id,
         author: newComment.author,
         content: newComment.content,
         createdAt: newComment.createdAt,
       },
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error adding comment:", error);
-    return { success: false };
+    return { success: false, error: error?.message || "Failed to add comment" };
   }
 }

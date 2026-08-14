@@ -77,7 +77,7 @@ model Farmer {
 
   // Relation back to the User/Agent who created this record (REQUIRED)
   createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -137,26 +137,26 @@ model Category {
 // 1. First Table: WorkPlan & Budget Uploads
 // ==========================================
 model WorkPlan {
-  id                  String    @id @default(uuid())
-  componentName       String    // e.g. "Component 1: Capacity building"
+  id                  String   @id @default(uuid())
+  componentName       String   // e.g. "Component 1: Capacity building"
   
   // Relational link to the Category table
   categoryId          String?
   category            Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   
-  budgetCategory      String?   // Kept as optional string fallback for uploaded raw values
+  budgetCategory      String?  // Kept as optional string fallback for uploaded raw values
 
-  description         String    @db.Text // Max 300 words description
-  detailedCalculation String    @db.Text // Calculation details text
-  unitCost            Float?    @default(0.0) // Optional cost per unit
-  quantity            Float?    @default(0.0) // Optional number of units
-  totalCostEstimate   Float     // Cost in chosen currency (unitCost * quantity)
-  currency            String    @default("USD")
-  timeFrame           String    // e.g. "Q1 2026 (Months 1-3)"
-  expectedOutput      String    @db.Text // Narrative of expected results
+  description         String   @db.Text // Max 300 words description
+  detailedCalculation String   @db.Text // Calculation details text
+  unitCost            Float?   @default(0.0) // Optional cost per unit
+  quantity            Float?   @default(0.0) // Optional number of units
+  totalCostEstimate   Float    // Cost in chosen currency (unitCost * quantity)
+  currency            String   @default("USD")
+  timeFrame           String   // e.g. "Q1 2026 (Months 1-3)"
+  expectedOutput      String   @db.Text // Narrative of expected results
   
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   // Linked performance tracking record (1-to-1 relation)
   performance         BudgetPerformance?
@@ -251,23 +251,23 @@ model LessonLearned {
 // 7. Blog & Knowledge Portal Models
 // ==========================================
 model BlogPost {
-  id          String       @id @default(cuid())
-  title       String
-  slug        String       @unique
-  excerpt     String       @db.Text
-  content     String       @db.Text
-  category    BlogCategory @default(FIELD_INSIGHTS)
-  authorName  String
-  authorRole  String?
-  location    String?
-  tag         String?      @default("Case Study")
-  imageUrl    String?      // 👈 Added featured image URL field
-  likes       Int          @default(0)
-  published   Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id        String       @id @default(cuid())
+  title     String
+  slug      String       @unique
+  excerpt   String       @db.Text
+  content   String       @db.Text
+  category  BlogCategory @default(FIELD_INSIGHTS)
+  authorName String
+  authorRole String?
+  location  String?
+  tag       String?      @default("Case Study")
+  imageUrl  String?      // 👈 Featured image URL field
+  likes     Int          @default(0)
+  published Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  comments    Comment[]
+  comments  Comment[]
 }
 
 model Comment {
@@ -279,4 +279,55 @@ model Comment {
   createdAt DateTime @default(now())
 
   @@index([postId])
+}
+
+// =========================================================================
+// 8. NEW ADDITION: Advisories & Alerts Feature
+// =========================================================================
+
+enum QueryStatus {
+  PENDING
+  AI_ANSWERED
+  AGENT_ANSWERED
+  RESOLVED
+}
+
+enum AlertSeverity {
+  INFO        // Daily best practices, general guidance
+  WARNING     // Pest alerts, disease outbreaks
+  URGENT      // Extreme weather, urgent market/price spikes
+}
+
+model AdvisoryQuery {
+  id          String      @id @default(cuid())
+  question    String      @db.Text
+  cropOrTopic String?     // e.g., "Cassava Rot", "Pesticide Application"
+  location    String?     // e.g., "Kano", "Oyo"
+  status      QueryStatus @default(PENDING)
+  
+  // Responses
+  aiAnswer    String?     @db.Text
+  agentAnswer String?     @db.Text
+  answeredBy  String?     // Agent Name or "AgriBot AI"
+  
+  authorName  String      @default("Anonymous Farmer")
+  authorEmail String?
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model AgriculturalAlert {
+  id          String        @id @default(cuid())
+  title       String
+  content     String        @db.Text
+  category    String        // e.g., "Best Practice", "Pest Control", "Soil Management"
+  severity    AlertSeverity @default(INFO)
+  imageUrl    String?
+  authorName  String        @default("AgriTech Advisory")
+  isVerified  Boolean       @default(true) // Admin/Expert verification badge
+  
+  likes       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
