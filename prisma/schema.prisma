@@ -71,7 +71,7 @@ model Farmer {
   userGroup              String
   nameOfChosenEnterprise String
   typeOfEnterprise       String
-  estimatedAnnualIncome Float
+  estimatedAnnualIncome  Float
   phoneNumber            String
   photoUrl               String?
 
@@ -154,6 +154,7 @@ model WorkPlan {
   currency            String   @default("USD")
   timeFrame           String   // e.g. "Q1 2026 (Months 1-3)"
   expectedOutput      String   @db.Text // Narrative of expected results
+  state               String?  @default("National (HQ)") // Implementation state or Hub
   
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -251,23 +252,23 @@ model LessonLearned {
 // 7. Blog & Knowledge Portal Models
 // ==========================================
 model BlogPost {
-  id        String       @id @default(cuid())
-  title     String
-  slug      String       @unique
-  excerpt   String       @db.Text
-  content   String       @db.Text
-  category  BlogCategory @default(FIELD_INSIGHTS)
+  id         String       @id @default(cuid())
+  title      String
+  slug       String       @unique
+  excerpt    String       @db.Text
+  content    String       @db.Text
+  category   BlogCategory @default(FIELD_INSIGHTS)
   authorName String
   authorRole String?
-  location  String?
-  tag       String?      @default("Case Study")
-  imageUrl  String?      // 👈 Featured image URL field
-  likes     Int          @default(0)
-  published Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  location   String?
+  tag        String?      @default("Case Study")
+  imageUrl   String?      // 👈 Featured image URL field
+  likes      Int          @default(0)
+  published  Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
-  comments  Comment[]
+  comments   Comment[]
 }
 
 model Comment {
@@ -318,16 +319,16 @@ model AdvisoryQuery {
 }
 
 model AgriculturalAlert {
-  id          String        @id @default(cuid())
-  title       String
-  content     String        @db.Text
-  category    String        // e.g., "Best Practice", "Pest Control", "Soil Management"
-  severity    AlertSeverity @default(INFO)
-  imageUrl    String?
-  authorName  String        @default("AgriTech Advisory")
-  isVerified  Boolean       @default(true) // Admin/Expert verification badge
+  id           String        @id @default(cuid())
+  title        String
+  content      String        @db.Text
+  category     String        // e.g., "Best Practice", "Pest Control", "Soil Management"
+  severity     AlertSeverity @default(INFO)
+  imageUrl     String?
+  authorName   String        @default("AgriTech Advisory")
+  isVerified   Boolean       @default(true) // Admin/Expert verification badge
   
-  likes       Int           @default(0)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  likes        Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }

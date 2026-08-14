@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createWorkPlanItem } from "./actions";
-import { Loader2, CheckCircle2, ShieldAlert, PlusCircle, Download } from "lucide-react";
+import { Loader2, CheckCircle2, ShieldAlert, PlusCircle, Download, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 
 const COMPONENTS = [
   "Component 1: Capacity building",
@@ -20,42 +20,116 @@ const BUDGET_CATEGORIES = [
   { label: "Training and Travels", value: "TRAINING_TRAVELS" },
 ] as const;
 
+const NIGERIAN_STATES = [
+  "National (HQ)",
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", 
+  "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", 
+  "FCT - Abuja", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", 
+  "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", 
+  "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", 
+  "Yobe", "Zamfara"
+] as const;
+
+export interface WorkPlanItem {
+  id: string;
+  componentName: string;
+  budgetCategory: string;
+  state: string;
+  description: string;
+  detailedCalculation: string;
+  unitCost: number;
+  quantity: number;
+  totalCostEstimate: number;
+  currency: string;
+  timeFrame: string;
+  expectedOutput: string;
+}
+
 export default function UploadWorkPlanPage() {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Saved items list state (acts as the excel-like table data source)
+  const [savedItems, setSavedItems] = useState<WorkPlanItem[]>([]);
+
+  // Filter states
+  const [filterComponent, setFilterComponent] = useState("ALL");
+  const [filterState, setFilterState] = useState("ALL");
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   const [form, setForm] = useState({
     componentName: COMPONENTS[0],
     budgetCategory: BUDGET_CATEGORIES[0].value,
+    state: NIGERIAN_STATES[0],
     description: "",
     detailedCalculation: "",
+    unitCost: "",
+    quantity: "",
     totalCostEstimate: "",
     currency: "USD",
     timeFrame: "",
     expectedOutput: "",
   });
 
+  // Automatically calculate total cost estimate when unitCost or quantity changes
+  useEffect(() => {
+    const cost = parseFloat(form.unitCost) || 0;
+    const qty = parseFloat(form.quantity) || 0;
+    if (cost > 0 && qty > 0) {
+      setForm((prev) => ({ ...prev, totalCostEstimate: (cost * qty).toString() }));
+    }
+  }, [form.unitCost, form.quantity]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterComponent, filterState]);
+
+  // Filtered rows for the Excel-like table & CSV export
+  const filteredItems = savedItems.filter((item) => {
+    const matchesComp = filterComponent === "ALL" || item.componentName === filterComponent;
+    const matchesState = filterState === "ALL" || item.state === filterState;
+    return matchesComp && matchesState;
+  });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE) || 1;
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const currentTableItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   const downloadCSV = () => {
-    const headers = ["Component", "Category", "Description", "Calculation", "Cost", "Currency", "TimeFrame", "ExpectedOutput"];
-    const values = [
-      `"${form.componentName.replace(/"/g, '""')}"`,
-      form.budgetCategory,
-      `"${form.description.replace(/"/g, '""')}"`,
-      `"${form.detailedCalculation.replace(/"/g, '""')}"`,
-      form.totalCostEstimate,
-      form.currency,
-      `"${form.timeFrame.replace(/"/g, '""')}"`,
-      `"${form.expectedOutput.replace(/"/g, '""')}"`
-    ];
-    
-    const csvContent = [headers.join(","), values.join(",")].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    if (filteredItems.length === 0) {
+      alert("No data available in the current filtered view to export.");
+      return;
+    }
+
+    const headers = ["Component", "Category", "State", "Description", "Calculation", "Unit Cost", "Quantity", "Total Cost", "Currency", "TimeFrame", "ExpectedOutput"];
+    const rows = filteredItems.map((item) => [
+      `"${item.componentName.replace(/"/g, '""')}"`,
+      item.budgetCategory,
+      `"${item.state.replace(/"/g, '""')}"`,
+      `"${item.description.replace(/"/g, '""')}"`,
+      `"${item.detailedCalculation.replace(/"/g, '""')}"`,
+      item.unitCost,
+      item.quantity,
+      item.totalCostEstimate,
+      item.currency,
+      `"${item.timeFrame.replace(/"/g, '""')}"`,
+      `"${item.expectedOutput.replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `workplan-item-${new Date().getTime()}.csv`;
+    a.download = `workplan-budget-${new Date().getTime()}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -69,12 +143,14 @@ export default function UploadWorkPlanPage() {
     setErrorMsg("");
     setSuccessMsg("");
 
-    // Defensive payload construction
     const payload = {
       componentName: form.componentName || COMPONENTS[0],
       budgetCategory: form.budgetCategory || BUDGET_CATEGORIES[0].value,
+      state: form.state || NIGERIAN_STATES[0],
       description: form.description,
       detailedCalculation: form.detailedCalculation,
+      unitCost: parseFloat(form.unitCost) || 0,
+      quantity: parseFloat(form.quantity) || 0,
       totalCostEstimate: parseFloat(form.totalCostEstimate) || 0,
       currency: form.currency || "USD",
       timeFrame: form.timeFrame,
@@ -92,12 +168,24 @@ export default function UploadWorkPlanPage() {
       const res = await createWorkPlanItem(payload);
 
       if (res.success) {
-        setSuccessMsg("Workplan and budget item successfully uploaded to Supabase database!");
+        setSuccessMsg("Workplan and budget item successfully uploaded and added to the table!");
+        
+        // Push newly saved item directly into local state table view
+        const newItem: WorkPlanItem = {
+          id: res.id || Math.random().toString(36).substring(2, 9),
+          ...payload
+        };
+        setSavedItems((prev) => [newItem, ...prev]);
+
+        // Reset form inputs
         setForm({
           componentName: COMPONENTS[0],
           budgetCategory: BUDGET_CATEGORIES[0].value,
+          state: NIGERIAN_STATES[0],
           description: "",
           detailedCalculation: "",
+          unitCost: "",
+          quantity: "",
           totalCostEstimate: "",
           currency: "USD",
           timeFrame: "",
@@ -114,39 +202,34 @@ export default function UploadWorkPlanPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-8 flex justify-between items-end">
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <PlusCircle className="text-[#16a34a] w-7 h-7" /> Upload Workplan and Budget
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Capture project activities, financial estimates, and expected outcomes mapped across the 5 core project components.
+            Capture project activities, financial unit metrics, and expected outcomes mapped across components and implementation states.
           </p>
         </div>
-        <button 
-          type="button"
-          onClick={downloadCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition cursor-pointer"
-        >
-          <Download className="w-4 h-4" /> Export Draft
-        </button>
       </div>
 
       {successMsg && (
-        <div className="mb-6 p-4 bg-[#16a34a]/10 border border-[#16a34a]/30 text-[#16a34a] rounded-xl flex items-center gap-3">
+        <div className="p-4 bg-[#16a34a]/10 border border-[#16a34a]/30 text-[#16a34a] rounded-xl flex items-center gap-3">
           <CheckCircle2 className="w-5 h-5 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl flex items-center gap-3">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl flex items-center gap-3">
           <ShieldAlert className="w-5 h-5 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
+      {/* Input Form */}
       <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-2">Column I: Project Component *</label>
@@ -163,23 +246,40 @@ export default function UploadWorkPlanPage() {
           </select>
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">Column II: Budget Category *</label>
-          <select
-            name="budgetCategory"
-            value={form.budgetCategory}
-            onChange={handleChange}
-            className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
-            required
-          >
-            {BUDGET_CATEGORIES.map((cat) => (
-              <option key={cat.value} value={cat.value} className="bg-slate-900 text-white">{cat.label}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Column II: Budget Category *</label>
+            <select
+              name="budgetCategory"
+              value={form.budgetCategory}
+              onChange={handleChange}
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
+              required
+            >
+              {BUDGET_CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value} className="bg-slate-900 text-white">{cat.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Column III: Implementation State / Hub *</label>
+            <select
+              name="state"
+              value={form.state}
+              onChange={handleChange}
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
+              required
+            >
+              {NIGERIAN_STATES.map((st) => (
+                <option key={st} value={st} className="bg-slate-900 text-white">{st}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">Column III: Description of Activities (Max 300 words) *</label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column IV: Description of Activities (Max 300 words) *</label>
           <textarea
             name="description"
             rows={4}
@@ -192,7 +292,7 @@ export default function UploadWorkPlanPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">Column IV: Detailed Calculation (Unit rates, quantities, formula breakdown) *</label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column V: Detailed Calculation (Unit rates, quantities, formula breakdown) *</label>
           <textarea
             name="detailedCalculation"
             rows={3}
@@ -204,9 +304,35 @@ export default function UploadWorkPlanPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-slate-300 mb-2">Column V: Total Cost Estimate *</label>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Unit Cost *</label>
+            <input
+              type="number"
+              step="0.01"
+              name="unitCost"
+              value={form.unitCost}
+              onChange={handleChange}
+              placeholder="0.00"
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Quantity *</label>
+            <input
+              type="number"
+              step="any"
+              name="quantity"
+              value={form.quantity}
+              onChange={handleChange}
+              placeholder="0"
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">Total Cost Estimate *</label>
             <input
               type="number"
               step="0.01"
@@ -214,7 +340,7 @@ export default function UploadWorkPlanPage() {
               value={form.totalCostEstimate}
               onChange={handleChange}
               placeholder="0.00"
-              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#16a34a]"
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold text-[#16a34a] focus:outline-none focus:border-[#16a34a]"
               required
             />
           </div>
@@ -234,7 +360,7 @@ export default function UploadWorkPlanPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">Column VI: Expected Time Frame *</label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column VII: Expected Time Frame *</label>
           <input
             type="text"
             name="timeFrame"
@@ -247,7 +373,7 @@ export default function UploadWorkPlanPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-2">Column VII: Expected Output and Outcome *</label>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">Column VIII: Expected Output and Outcome *</label>
           <textarea
             name="expectedOutput"
             rows={3}
@@ -273,6 +399,146 @@ export default function UploadWorkPlanPage() {
           )}
         </button>
       </form>
+
+      {/* Excel-Like Table Section with Filters, Export Controls & Pagination */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Filter className="w-5 h-5 text-[#16a34a]" /> Workplan & Budget Ledger
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              {filteredItems.length === 0
+                ? "No entries found."
+                : `Showing ${startIndex + 1} to ${Math.min(startIndex + ITEMS_PER_PAGE, filteredItems.length)} of ${filteredItems.length} entries (filtered from ${savedItems.length} total records)`}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <select
+              value={filterComponent}
+              onChange={(e) => setFilterComponent(e.target.value)}
+              className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-[#16a34a]"
+            >
+              <option value="ALL">All Components</option>
+              {COMPONENTS.map((comp) => (
+                <option key={comp} value={comp}>{comp}</option>
+              ))}
+            </select>
+
+            <select
+              value={filterState}
+              onChange={(e) => setFilterState(e.target.value)}
+              className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-[#16a34a]"
+            >
+              <option value="ALL">All States / Hubs</option>
+              {NIGERIAN_STATES.map((st) => (
+                <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
+
+            <button 
+              type="button"
+              onClick={downloadCSV}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-medium rounded-xl transition cursor-pointer shadow-sm"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV Export
+            </button>
+          </div>
+        </div>
+
+        {/* Excel Spreadsheet Wrapper */}
+        <div className="overflow-x-auto border border-slate-800 rounded-xl">
+          <table className="w-full text-left text-xs text-slate-300 border-collapse">
+            <thead className="bg-slate-950 text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-800">
+              <tr>
+                <th className="p-3 border-r border-slate-800">Component</th>
+                <th className="p-3 border-r border-slate-800">Category</th>
+                <th className="p-3 border-r border-slate-800">State / Hub</th>
+                <th className="p-3 border-r border-slate-800">Description</th>
+                <th className="p-3 border-r border-slate-800">Calculation</th>
+                <th className="p-3 border-r border-slate-800 text-right">Unit Cost</th>
+                <th className="p-3 border-r border-slate-800 text-right">Qty</th>
+                <th className="p-3 border-r border-slate-800 text-right">Total Cost</th>
+                <th className="p-3 border-r border-slate-800">Currency</th>
+                <th className="p-3 border-r border-slate-800">Timeframe</th>
+                <th className="p-3">Expected Output</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800 bg-slate-900 font-mono">
+              {currentTableItems.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="text-center py-8 text-slate-500 font-sans italic">
+                    No entries found matching the filter criteria. Submit the form above to add items.
+                  </td>
+                </tr>
+              ) : (
+                currentTableItems.map((item, idx) => (
+                  <tr key={item.id || idx} className="hover:bg-slate-800/50 transition">
+                    <td className="p-3 border-r border-slate-800 font-sans font-medium text-white">{item.componentName}</td>
+                    <td className="p-3 border-r border-slate-800 font-sans">{item.budgetCategory}</td>
+                    <td className="p-3 border-r border-slate-800 font-sans text-[#16a34a] font-semibold">{item.state}</td>
+                    <td className="p-3 border-r border-slate-800 font-sans max-w-xs truncate">{item.description}</td>
+                    <td className="p-3 border-r border-slate-800">{item.detailedCalculation}</td>
+                    <td className="p-3 border-r border-slate-800 text-right">{Number(item.unitCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="p-3 border-r border-slate-800 text-right">{item.quantity}</td>
+                    <td className="p-3 border-r border-slate-800 text-right font-bold text-white">{Number(item.totalCostEstimate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="p-3 border-r border-slate-800">{item.currency}</td>
+                    <td className="p-3 border-r border-slate-800 font-sans">{item.timeFrame}</td>
+                    <td className="p-3 font-sans max-w-xs truncate">{item.expectedOutput}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Controls */}
+        {filteredItems.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+            <span className="text-xs text-slate-400 font-sans">
+              Page <strong className="text-white">{currentPage}</strong> of <strong className="text-white">{totalPages}</strong>
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 text-xs font-medium rounded-xl transition cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" /> Previous
+              </button>
+
+              <div className="hidden sm:flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
+                  <button
+                    key={pageNumber}
+                    type="button"
+                    onClick={() => setCurrentPage(pageNumber)}
+                    className={`w-8 h-8 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center ${
+                      currentPage === pageNumber
+                        ? "bg-[#16a34a] text-white shadow-sm"
+                        : "bg-slate-950 border border-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 text-xs font-medium rounded-xl transition cursor-pointer"
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
