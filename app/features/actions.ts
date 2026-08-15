@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 export async function createWorkPlanItem(formData: {
   componentName: string;
   budgetCategory: string;
+  state: string; // Added state property matching form submission
   description: string;
   detailedCalculation: string;
   unitCost: number;
@@ -25,6 +26,7 @@ export async function createWorkPlanItem(formData: {
       data: {
         componentName: formData.componentName,
         budgetCategory: formData.budgetCategory,
+        state: formData.state, // Stored directly in the database model
         description: formData.description,
         detailedCalculation: formData.detailedCalculation,
         unitCost: Number(formData.unitCost) || 0,

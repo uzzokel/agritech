@@ -23,7 +23,9 @@ export default function WorkPlanForm({ onSuccess }: { onSuccess?: () => void }) 
       budgetCategory: formData.get("budgetCategory") as string,
       description: formData.get("description") as string,
       detailedCalculation: formData.get("detailedCalculation") as string,
-      totalCostEstimate: Number(formData.get("totalCostEstimate")),
+      unitCost: Number(formData.get("unitCost")) || 0,
+      quantity: Number(formData.get("quantity")) || 0,
+      totalCostEstimate: Number(formData.get("totalCostEstimate")) || 0,
       currency: (formData.get("currency") as string) || "USD",
       timeFrame: formData.get("timeFrame") as string,
       expectedOutput: formData.get("expectedOutput") as string,
@@ -92,6 +94,32 @@ export default function WorkPlanForm({ onSuccess }: { onSuccess?: () => void }) 
             <option value="GOODS_EQUIPMENT">Goods & Equipment</option>
             <option value="TRAINING_TRAVELS">Training & Travels</option>
           </select>
+        </div>
+
+        {/* Unit Cost */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Unit Cost</label>
+          <input
+            type="number"
+            step="any"
+            name="unitCost"
+            required
+            placeholder="0.00"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-[#16a34a] text-sm font-mono"
+          />
+        </div>
+
+        {/* Quantity */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Quantity</label>
+          <input
+            type="number"
+            step="any"
+            name="quantity"
+            required
+            placeholder="0"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-[#16a34a] text-sm font-mono"
+          />
         </div>
 
         {/* Total Cost Estimate */}
