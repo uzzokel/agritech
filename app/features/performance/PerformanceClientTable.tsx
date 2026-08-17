@@ -3,14 +3,16 @@
 import { useState, useMemo } from "react";
 import { updatePerformanceItem } from "../actions";
 import { Loader2, Download, Save, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { NIGERIAN_STATES } from "@/app/constants";
 
 export default function PerformanceClientTable({ initialItems }: { initialItems: any[] }) {
   const [items, setItems] = useState(initialItems);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Filter State (Category filter removed)
+  // Filter States
   const [selectedComponent, setSelectedComponent] = useState<string>("ALL");
+  const [selectedState, setSelectedState] = useState<string>("ALL");
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -29,7 +31,7 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
     return initial;
   });
 
-  // Unique list of components for filter dropdown
+  // Unique list of components extracted from items
   const uniqueComponents = useMemo(() => {
     const set = new Set<string>();
     items.forEach((item) => {
@@ -38,12 +40,14 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
     return Array.from(set).sort();
   }, [items]);
 
-  // Filtered items based on component selection
+  // Filtered items based on component and state selection
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      return selectedComponent === "ALL" || item.componentName === selectedComponent;
+      const matchComponent = selectedComponent === "ALL" || item.componentName === selectedComponent;
+      const matchState = selectedState === "ALL" || item.state === selectedState;
+      return matchComponent && matchState;
     });
-  }, [items, selectedComponent]);
+  }, [items, selectedComponent, selectedState]);
 
   const calculateAutomaticFlag = (percent: number) => {
     if (percent < 50) return "RED";
@@ -94,6 +98,7 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
   const handleDownloadCSV = () => {
     const headers = [
       "Component",
+      "State",
       "Activity Code",
       "Description",
       "Estimated Cost",
@@ -116,6 +121,7 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
 
       return [
         `"${item.componentName || ""}"`,
+        `"${item.state || ""}"`,
         `"${item.activityCode || item.code || item.id || ""}"`,
         `"${(item.description || "").replace(/"/g, '""')}"`,
         estimated,
@@ -178,7 +184,6 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
 
   return (
     <div>
-      {/* Top Action Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <div>
           {successMsg && (
@@ -206,14 +211,12 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
         </div>
       </div>
 
-      {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-4 p-4 mb-6 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-md">
         <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
           <Filter className="w-4 h-4 text-[#16a34a]" />
           <span>Filters:</span>
         </div>
 
-        {/* Component Filter */}
         <div className="flex items-center gap-2">
           <label htmlFor="component-filter" className="text-xs text-slate-300 font-medium">
             Component:
@@ -236,11 +239,33 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
           </select>
         </div>
 
-        {/* Reset Filter button */}
-        {selectedComponent !== "ALL" && (
+        <div className="flex items-center gap-2">
+          <label htmlFor="state-filter" className="text-xs text-slate-300 font-medium">
+            State:
+          </label>
+          <select
+            id="state-filter"
+            value={selectedState}
+            onChange={(e) => {
+              setSelectedState(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-[#16a34a]"
+          >
+            <option value="ALL">All States / National</option>
+            {NIGERIAN_STATES.map((st) => (
+              <option key={st} value={st}>
+                {st}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(selectedComponent !== "ALL" || selectedState !== "ALL") && (
           <button
             onClick={() => {
               setSelectedComponent("ALL");
+              setSelectedState("ALL");
               setCurrentPage(1);
             }}
             className="text-xs text-slate-400 hover:text-red-400 underline transition cursor-pointer ml-auto"
@@ -250,13 +275,13 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
         )}
       </div>
 
-      {/* Table Container */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-950/80 border-b border-slate-800 text-xs font-semibold text-slate-400">
                 <th className="p-4">Component</th>
+                <th className="p-4">State</th>
                 <th className="p-4">Activity Code</th>
                 <th className="p-4">Activity Description</th>
                 <th className="p-4">Estimated Cost</th>
@@ -271,7 +296,7 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
             <tbody className="divide-y divide-slate-800 text-sm">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-8 text-center text-slate-500">
+                  <td colSpan={11} className="p-8 text-center text-slate-500">
                     {items.length === 0
                       ? "No workplan items found for referencing. Upload a workplan first."
                       : "No items match the selected filter criteria."}
@@ -298,6 +323,9 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
                       <td className="p-4 font-medium text-white max-w-[160px] truncate">
                         {item.componentName}
                       </td>
+                      <td className="p-4 text-xs text-slate-300">
+                        {item.state || "National (HQ)"}
+                      </td>
                       <td className="p-4 font-mono text-xs text-slate-400 max-w-[120px] truncate">
                         {activityCode || "-"}
                       </td>
@@ -312,7 +340,6 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
                       </td>
                       <td className="p-4 text-xs text-slate-400">{item.timeFrame}</td>
 
-                      {/* Actual Disbursed Input */}
                       <td className="p-4 font-mono">
                         <input
                           type="number"
@@ -325,7 +352,6 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
                         />
                       </td>
 
-                      {/* Variance */}
                       <td
                         className={`p-4 font-mono ${
                           variance < 0 ? "text-red-400 font-semibold" : "text-slate-300"
@@ -334,10 +360,8 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
                         ${variance.toLocaleString()}
                       </td>
 
-                      {/* Performance percentage */}
                       <td className="p-4 font-semibold text-[#16a34a]">{percent}%</td>
 
-                      {/* Result Progress Input */}
                       <td className="p-4 text-slate-300">
                         <input
                           type="text"
@@ -350,7 +374,6 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
                         />
                       </td>
 
-                      {/* Status Flag Badge (Automated) */}
                       <td className="p-4 whitespace-nowrap">
                         {getFlagBadge(automatedFlag)}
                       </td>
@@ -362,7 +385,6 @@ export default function PerformanceClientTable({ initialItems }: { initialItems:
           </table>
         </div>
 
-        {/* Pagination Footer Controls */}
         {filteredItems.length > 0 && (
           <div className="flex items-center justify-between px-6 py-4 bg-slate-950/80 border-t border-slate-800 text-xs text-slate-400">
             <div>

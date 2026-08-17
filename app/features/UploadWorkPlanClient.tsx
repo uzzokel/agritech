@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createWorkPlanItem } from "./actions";
-import { Loader2, CheckCircle2, ShieldAlert, PlusCircle, Download, FileText, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, CheckCircle2, ShieldAlert, PlusCircle, Download, FileText, Filter, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { NIGERIAN_STATES } from "../constants";
 
 const COMPONENTS = [
   "Component 1: Capacity building",
@@ -19,16 +20,6 @@ const BUDGET_CATEGORIES = [
   { label: "Consultancy and Services", value: "CONSULTANCY" },
   { label: "Goods and Equipment", value: "GOODS_EQUIPMENT" },
   { label: "Training and Travels", value: "TRAINING_TRAVELS" },
-] as const;
-
-const NIGERIAN_STATES = [
-  "National (HQ)",
-  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", 
-  "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", 
-  "FCT - Abuja", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", 
-  "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", 
-  "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", 
-  "Yobe", "Zamfara"
 ] as const;
 
 export interface WorkPlanItem {
@@ -56,14 +47,12 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Initialize state safely without update loops
   const [savedItems, setSavedItems] = useState<WorkPlanItem[]>(initialItems);
 
-  // Filter states
   const [filterComponent, setFilterComponent] = useState("ALL");
   const [filterState, setFilterState] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
@@ -81,7 +70,6 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
     expectedOutput: "",
   });
 
-  // Automatically calculate total cost estimate when unitCost or quantity changes
   useEffect(() => {
     const cost = parseFloat(form.unitCost) || 0;
     const qty = parseFloat(form.quantity) || 0;
@@ -90,22 +78,28 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
     }
   }, [form.unitCost, form.quantity]);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterComponent, filterState]);
+  }, [filterComponent, filterState, searchQuery]);
 
-  // Filtered rows for table, CSV, & PDF export
   const filteredItems = savedItems.filter((item) => {
     const matchesComp = filterComponent === "ALL" || item.componentName === filterComponent;
     const matchesState = filterState === "ALL" || item.state === filterState;
-    return matchesComp && matchesState;
+    const matchesSearch = 
+      searchQuery === "" || 
+      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.detailedCalculation.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.expectedOutput.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesComp && matchesState && matchesSearch;
   });
 
-  // Pagination calculations
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE) || 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const currentTableItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Summary Metrics calculations
+  const totalBudgetFiltered = filteredItems.reduce((acc, item) => acc + (Number(item.totalCostEstimate) || 0), 0);
+  const uniqueStatesCount = new Set(filteredItems.map(item => item.state)).size;
 
   const downloadCSV = () => {
     if (filteredItems.length === 0) {
@@ -163,6 +157,7 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
         <body>
           <h2>AgriTech Workplan & Budget Ledger</h2>
           <p>Generated on ${new Date().toLocaleString()}</p>
+          <p><strong>Total Filtered Cost:</strong> ${filteredItems[0]?.currency || 'USD'} ${totalBudgetFiltered.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
           <table>
             <thead>
               <tr>
@@ -235,11 +230,23 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
 
       if (res.success && res.data) {
         setSuccessMsg("Workplan and budget item successfully saved to database!");
+        
+        const newItem: WorkPlanItem = {
+          id: res.data.id,
+          componentName: res.data.componentName,
+          budgetCategory: res.data.budgetCategory ?? "CIVIL_WORKS",
+          state: (res.data as any).state ?? NIGERIAN_STATES[0],
+          description: res.data.description,
+          detailedCalculation: res.data.detailedCalculation,
+          unitCost: Number(res.data.unitCost),
+          quantity: Number(res.data.quantity),
+          totalCostEstimate: Number(res.data.totalCostEstimate),
+          currency: res.data.currency,
+          timeFrame: res.data.timeFrame,
+          expectedOutput: res.data.expectedOutput,
+        };
 
-        // Immediately prepend the newly created item to local state
-        setSavedItems((prev) => [res.data as WorkPlanItem, ...prev]);
-
-        // Reset form inputs
+        setSavedItems((prev) => [newItem, ...prev]);
         setForm({
           componentName: COMPONENTS[0],
           budgetCategory: BUDGET_CATEGORIES[0].value,
@@ -253,7 +260,6 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
           timeFrame: "",
           expectedOutput: "",
         });
-
         router.refresh();
       } else {
         setErrorMsg((res as any).error || "Failed to save item to database.");
@@ -265,9 +271,26 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
     }
   };
 
+  const handleClearForm = () => {
+    setForm({
+      componentName: COMPONENTS[0],
+      budgetCategory: BUDGET_CATEGORIES[0].value,
+      state: NIGERIAN_STATES[0],
+      description: "",
+      detailedCalculation: "",
+      unitCost: "",
+      quantity: "",
+      totalCostEstimate: "",
+      currency: "USD",
+      timeFrame: "",
+      expectedOutput: "",
+    });
+    setErrorMsg("");
+    setSuccessMsg("");
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
-      {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -293,7 +316,6 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
         </div>
       )}
 
-      {/* Input Form */}
       <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-2">Column I: Project Component *</label>
@@ -449,22 +471,49 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-4 bg-[#16a34a] hover:bg-[#15803d] text-white font-semibold rounded-xl transition duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#16a34a]/20"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" /> Saving to Database...
-            </>
-          ) : (
-            "Save Workplan & Budget Item"
-          )}
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 py-4 bg-[#16a34a] hover:bg-[#15803d] text-white font-semibold rounded-xl transition duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#16a34a]/20"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" /> Saving to Database...
+              </>
+            ) : (
+              "Save Workplan & Budget Item"
+            )}
+          </button>
+          
+          <button
+            type="button"
+            onClick={handleClearForm}
+            className="px-6 py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition border border-slate-700 cursor-pointer flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" /> Clear Form
+          </button>
+        </div>
       </form>
 
-      {/* Excel-Like Table Section with Filters, Export Controls & Pagination */}
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <p className="text-xs font-medium text-slate-400">Total Filtered Entries</p>
+          <p className="text-2xl font-bold text-white mt-1">{filteredItems.length}</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <p className="text-xs font-medium text-slate-400">Total Filtered Budget</p>
+          <p className="text-2xl font-bold text-[#16a34a] mt-1">
+            {filteredItems[0]?.currency || "USD"} {totalBudgetFiltered.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <p className="text-xs font-medium text-slate-400">States / Hubs Involved</p>
+          <p className="text-2xl font-bold text-white mt-1">{uniqueStatesCount}</p>
+        </div>
+      </div>
+
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div>
@@ -479,6 +528,14 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <input
+              type="text"
+              placeholder="Search description/calc..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#16a34a]"
+            />
+
             <select
               value={filterComponent}
               onChange={(e) => setFilterComponent(e.target.value)}
@@ -519,7 +576,6 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
           </div>
         </div>
 
-        {/* Excel Spreadsheet Wrapper */}
         <div className="overflow-x-auto border border-slate-800 rounded-xl">
           <table className="w-full text-left text-xs text-slate-300 border-collapse">
             <thead className="bg-slate-950 text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-800">
@@ -565,7 +621,6 @@ export default function UploadWorkPlanPage({ initialItems = [] }: UploadWorkPlan
           </table>
         </div>
 
-        {/* Pagination Controls */}
         {filteredItems.length > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
             <span className="text-xs text-slate-400 font-sans">
