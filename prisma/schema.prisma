@@ -332,3 +332,38 @@ model AgriculturalAlert {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
+
+
+// ==========================================
+// Policy & Success Stories Model (Table 1)
+// ==========================================
+model SuccessStory {
+  id           String   @id @default(uuid())
+  farmerId     String?
+  fullName     String
+  state        String
+  clusterName  String?
+  userGroup    String?
+  location     String?
+  gps          String?  // e.g. "7.3986° N, 3.9058° E"
+  imageUrl    String?   // <-- Add this line to match your database schema
+  narration    String   @db.Text // Max 300 words
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ==========================================
+// Routine Productivity Data Model (Table 2)
+// ==========================================
+model RoutinePerformance {
+  id          String   @id @default(uuid())
+  state       String   // e.g. "Kano", "Oyo", "National (HQ)"
+  quarter     String   // e.g. "Q1", "Q2", "Q3", "Q4"
+  year        String   // e.g. "2026"
+  kpi         String   // e.g. "Farmers Registered", "Area under cultivation (Ha)"
+  baseline    Float    @default(0.0)
+  target      Float    @default(0.0)
+  achievement Float    @default(0.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
