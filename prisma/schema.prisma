@@ -338,18 +338,18 @@ model AgriculturalAlert {
 // Policy & Success Stories Model (Table 1)
 // ==========================================
 model SuccessStory {
-  id           String   @id @default(uuid())
-  farmerId     String?
-  fullName     String
-  state        String
-  clusterName  String?
-  userGroup    String?
-  location     String?
-  gps          String?  // e.g. "7.3986° N, 3.9058° E"
+  id          String   @id @default(uuid())
+  farmerId    String?
+  fullName    String
+  state       String
+  clusterName String?
+  userGroup   String?
+  location    String?
+  gps         String?  // e.g. "7.3986° N, 3.9058° E"
   imageUrl    String?   // <-- Add this line to match your database schema
-  narration    String   @db.Text // Max 300 words
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  narration   String   @db.Text // Max 300 words
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ==========================================
@@ -366,4 +366,20 @@ model RoutinePerformance {
   achievement Float    @default(0.0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+
+// ==========================================
+// Policy Briefs Model (Admin Editable)
+// ==========================================
+model PolicyBrief {
+  id              String   @id @default(uuid())
+  title           String
+  domain          String
+  focus           String   @db.Text
+  recommendations String[] // Array of strings for bullet points
+  fontFamily      String   @default("sans") // "sans", "serif", or "mono"
+  fontSize        String   @default("text-base") // "text-sm", "text-base", or "text-lg"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

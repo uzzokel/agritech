@@ -120,8 +120,48 @@ export async function getRoutinePerformance({ page = 1, search = "", state = "Al
   };
 }
 
-// 3. Export Data to CSV Action
-export async function exportPolicyDataToCsv(type: "stories" | "routine", state = "All") {
+// 3. Fetch Policy Briefs with Pagination
+export async function getPolicyBriefs({ page = 1, search = "" }: FetchParams) {
+  const pageSize = 10;
+  const skip = (page - 1) * pageSize;
+
+  const whereClause: any = {};
+  if (search) {
+    whereClause.OR = [
+      { title: { contains: search, mode: "insensitive" } },
+      { domain: { contains: search, mode: "insensitive" } },
+      { focus: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [data, totalCount] = await Promise.all([
+    prisma.policyBrief.findMany({
+      where: whereClause,
+      skip,
+      take: pageSize,
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.policyBrief.count({ where: whereClause }),
+  ]);
+
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
+  const startItem = totalCount === 0 ? 0 : skip + 1;
+  const endItem = Math.min(skip + pageSize, totalCount);
+
+  return {
+    data,
+    pagination: {
+      currentPage: page,
+      totalPages,
+      totalCount,
+      startItem,
+      endItem,
+    },
+  };
+}
+
+// 4. Export Data to CSV Action
+export async function exportPolicyDataToCsv(type: "stories" | "routine" | "briefs", state = "All") {
   const whereClause: any = state !== "All" ? { state } : {};
 
   if (type === "stories") {
@@ -140,7 +180,7 @@ export async function exportPolicyDataToCsv(type: "stories" | "routine", state =
       r.createdAt.toISOString(),
     ]);
     return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-  } else {
+  } else if (type === "routine") {
     const records = await prisma.routinePerformance.findMany({ where: whereClause });
     const headers = ["State", "Quarter", "Year", "KPI", "Baseline", "Target", "Achievement", "% Achieved", "Variance", "Flag"];
     const rows = records.map((r) => {
@@ -164,10 +204,22 @@ export async function exportPolicyDataToCsv(type: "stories" | "routine", state =
       ];
     });
     return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+  } else {
+    const records = await prisma.policyBrief.findMany();
+    const headers = ["ID", "Domain", "Title", "Focus", "Recommendations", "Updated At"];
+    const rows = records.map((r: any) => [
+      r.id,
+      `"${r.domain}"`,
+      `"${r.title.replace(/"/g, '""')}"`,
+      `"${r.focus.replace(/"/g, '""')}"`,
+      `"${(r.recommendations || []).join("; ").replace(/"/g, '""')}"`,
+      r.updatedAt.toISOString(),
+    ]);
+    return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
   }
 }
 
-// 4. Create Success Story Action (with Supabase Image Upload)
+// 5. Create Success Story Action (with Supabase Image Upload)
 export async function createSuccessStory(formData: FormData) {
   try {
     const file = formData.get("image") as File;
@@ -218,7 +270,7 @@ export async function createSuccessStory(formData: FormData) {
   }
 }
 
-// 5. Create Routine Performance Action
+// 6. Create Routine Performance Action
 export async function createRoutinePerformance(formData: FormData) {
   try {
     await prisma.routinePerformance.create({
@@ -239,8 +291,8 @@ export async function createRoutinePerformance(formData: FormData) {
   }
 }
 
-// 6. Delete Policy Record Action (Admin Only)
-export async function deletePolicyRecord(tab: "stories" | "routine", id: string, isAdmin: boolean = true) {
+// 7. Delete Policy Record Action (Admin Only) - Supports stories, routine, and briefs
+export async function deletePolicyRecord(tab: "stories" | "routine" | "briefs", id: string, isAdmin: boolean = true) {
   try {
     if (!isAdmin) {
       return { success: false, error: "Unauthorized: Admin access required." };
@@ -250,8 +302,12 @@ export async function deletePolicyRecord(tab: "stories" | "routine", id: string,
       await prisma.successStory.delete({
         where: { id },
       });
-    } else {
+    } else if (tab === "routine") {
       await prisma.routinePerformance.delete({
+        where: { id },
+      });
+    } else if (tab === "briefs") {
+      await prisma.policyBrief.delete({
         where: { id },
       });
     }
@@ -261,5 +317,56 @@ export async function deletePolicyRecord(tab: "stories" | "routine", id: string,
   } catch (error) {
     console.error("Failed to delete record:", error);
     return { success: false, error: "Database error: Could not delete the record." };
+  }
+}
+
+// 8. Get Single Policy Brief Content Action (Legacy compatibility wrapper)
+export async function getPolicyBrief() {
+  try {
+    const briefRecord = await prisma.policyBrief.findFirst({
+      orderBy: { updatedAt: "desc" },
+    });
+    return briefRecord || null;
+  } catch (error) {
+    console.error("Failed to fetch policy brief:", error);
+    return null;
+  }
+}
+
+// 9. Update / Create Policy Brief Content Action (Structured fields)
+export async function updatePolicyBrief(
+  data: {
+    title: string;
+    domain: string;
+    focus: string;
+    recommendations: string[];
+    fontFamily?: string;
+    fontSize?: string;
+  },
+  isAdmin: boolean = true
+) {
+  try {
+    if (!isAdmin) {
+      return { success: false, error: "Unauthorized: Admin access required." };
+    }
+
+    const payload = {
+      title: data.title,
+      domain: data.domain,
+      focus: data.focus,
+      recommendations: data.recommendations,
+      fontFamily: data.fontFamily || "sans",
+      fontSize: data.fontSize || "text-base",
+    };
+
+    await prisma.policyBrief.create({
+      data: payload as any,
+    });
+
+    revalidatePath("/blog");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update policy brief:", error);
+    return { success: false, error: "Database error: Could not update policy brief." };
   }
 }
