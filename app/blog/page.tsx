@@ -4,7 +4,8 @@ import { getAllBlogPosts, getBlogPostsByCategory } from "@/app/actions/blog-acti
 import { getAdvisoryData } from "@/app/actions/advisory-actions";
 import { BlogFeed } from "./BlogFeed";
 import AdvisoriesFeed from "./AdvisoriesFeed";
-import { PolicyFeed } from "./PolicyFeed"; // 👈 Import your new PolicyFeed component
+import { PolicyFeed } from "./PolicyFeed";
+import { TechUpdatesFeed } from "./TechUpdatesFeed"; // 👈 Import your new TechUpdatesFeed component
 
 // Force Next.js to bypass static cache and fetch live database data every time
 export const dynamic = "force-dynamic";
@@ -32,12 +33,17 @@ export default async function BlogPage({ searchParams }: PageProps) {
     );
   }
 
-  // 2. If Policy Briefs is clicked from the sidebar (👈 NEW CONDITION)
+  // 2. If Policy Briefs is clicked from the sidebar
   if (currentCategoryKey === "policy") {
     return <PolicyFeed />;
   }
 
-  // 3. Existing Flow: Fetch all posts when default/all, or filter by specific category
+  // 3. If Tech Updates is clicked from the sidebar (👈 NEW CONDITION)
+  if (currentCategoryKey === "tech") {
+    return <TechUpdatesFeed />;
+  }
+
+  // 4. Existing Flow: Fetch all posts when default/all, or filter by specific category
   const response =
     currentCategoryKey === "all"
       ? await getAllBlogPosts()

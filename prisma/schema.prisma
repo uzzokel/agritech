@@ -383,3 +383,18 @@ model PolicyBrief {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+model TechAdoption {
+  id                 String   @id @default(uuid())
+  technologyName     String
+  category           String   // Input & Seeds | Digital / Mobile | Machinery & Equipment | Soil & Irrigation
+  state              String
+  clusterName        String
+  adoptionRate       Float    // Percentage (0 - 100)
+  beneficiariesCount Int      // Total farmers reached
+  notes              String   // Field feedback / observations
+  imageUrl           String?  // Supabase bucket photo evidence
+  recordedBy         String?  // Extension officer name
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
