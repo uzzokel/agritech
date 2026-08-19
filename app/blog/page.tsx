@@ -5,7 +5,8 @@ import { getAdvisoryData } from "@/app/actions/advisory-actions";
 import { BlogFeed } from "./BlogFeed";
 import AdvisoriesFeed from "./AdvisoriesFeed";
 import { PolicyFeed } from "./PolicyFeed";
-import { TechUpdatesFeed } from "./TechUpdatesFeed"; // 👈 Import your new TechUpdatesFeed component
+import { TechUpdatesFeed } from "./TechUpdatesFeed";
+import { MarketFeed } from "./MarketFeed"; // 👈 Import your new MarketFeed component
 
 // Force Next.js to bypass static cache and fetch live database data every time
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function BlogPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams;
   const currentCategoryKey = resolvedParams.category || "all";
 
-  // 1. If Advisories & Alerts is clicked from the sidebar
+  // 1. If Advisories & Alerts is clicked
   if (currentCategoryKey === "advisories") {
     const advisoryRes = await getAdvisoryData();
     const alerts = advisoryRes?.alerts || [];
@@ -33,17 +34,22 @@ export default async function BlogPage({ searchParams }: PageProps) {
     );
   }
 
-  // 2. If Policy Briefs is clicked from the sidebar
+  // 2. If Policy Briefs is clicked
   if (currentCategoryKey === "policy") {
     return <PolicyFeed />;
   }
 
-  // 3. If Tech Updates is clicked from the sidebar (👈 NEW CONDITION)
+  // 3. If Tech Updates is clicked
   if (currentCategoryKey === "tech") {
     return <TechUpdatesFeed />;
   }
 
-  // 4. Existing Flow: Fetch all posts when default/all, or filter by specific category
+  // 4. If Marketplace is clicked (👈 NEW CONDITION)
+  if (currentCategoryKey === "market") {
+    return <MarketFeed />;
+  }
+
+  // 5. Existing Flow: Fetch all posts when default/all, or filter by specific category
   const response =
     currentCategoryKey === "all"
       ? await getAllBlogPosts()

@@ -31,21 +31,21 @@ enum BlogCategory {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  clerkUserId   String?  @unique
-  uniqueAdminId String?  @unique
-  securityPin   String
-  fullName      String
-  email         String   @unique
-  designation   String
-  lga           String
-  state         String
-  phoneNumber   String?
-  role          Role     @default(USER)
-  status        Status   @default(PENDING)
-  emailSent     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(uuid())
+  clerkUserId    String?  @unique
+  uniqueAdminId  String?  @unique
+  securityPin    String
+  fullName       String
+  email          String   @unique
+  designation    String
+  lga            String
+  state          String
+  phoneNumber    String?
+  role           Role     @default(USER)
+  status         Status   @default(PENDING)
+  emailSent      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Linked farmer records registered by this user/agent
   farmers Farmer[]
@@ -167,16 +167,16 @@ model WorkPlan {
 // 2. Second Table: Budget Performance (Linked)
 // ==========================================
 model BudgetPerformance {
-  id              String   @id @default(uuid())
-  workPlanId      String   @unique
-  workPlan        WorkPlan @relation(fields: [workPlanId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  workPlanId     String   @unique
+  workPlan       WorkPlan @relation(fields: [workPlanId], references: [id], onDelete: Cascade)
 
   amountDisbursed Float    @default(0.0)
   actualOutput    String?  @db.Text // Actual progress notes
   statusFlag      String   @default("GREEN") // GREEN, AMBER, RED
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 // ==========================================
@@ -202,15 +202,15 @@ model PerformanceTarget {
 // 4. Performance Actual (Table 2: Monitoring & Variance)
 // ==========================================
 model PerformanceActual {
-  id          String            @id @default(uuid())
-  targetId    String
-  target      PerformanceTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  id        String            @id @default(uuid())
+  targetId  String
+  target    PerformanceTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
-  actualValue Float             // Actual progress achieved
-  remarks     String?           @db.Text // Optional comments or notes
+  actualValue Float               // Actual progress achieved
+  remarks     String?             @db.Text // Optional comments or notes
 
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   @@index([targetId])
 }
@@ -397,4 +397,65 @@ model TechAdoption {
   recordedBy         String?  // Extension officer name
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+model MarketProduct {
+  id           String           @id @default(uuid())
+  title        String
+  category     String           // e.g., Grains, Tubers, Vegetables, Livestock
+  description  String           // Brief description (up to 300 words)
+  price        Float
+  currency     String           // "NGN" or "USD"
+  imageUrl     String?          // Supabase storage image evidence
+  sellerName   String
+  location     String           // State/Cluster
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  
+  likes        ProductLike[]
+  comments     ProductComment[]
+  orders       ProductOrder[]
+  inquiries    ProductInquiry[] // 👈 Added relationship for product inquiries
+}
+
+model ProductLike {
+  id        String        @id @default(uuid())
+  productId String
+  product   MarketProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String        // Identifier or email for tracking who liked
+  createdAt DateTime      @default(now())
+
+  @@unique([productId, userId])
+}
+
+model ProductComment {
+  id        String        @id @default(uuid())
+  productId String
+  product   MarketProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  author    String
+  content   String
+  createdAt DateTime      @default(now())
+}
+
+model ProductOrder {
+  id           String        @id @default(uuid())
+  productId    String
+  product      MarketProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  buyerName    String
+  buyerPhone   String
+  quantity     Float         // e.g., number of bags or units
+  deliveryNote String?       // Specific delivery location or instructions
+  status       String        @default("Pending") // Pending, Confirmed, Completed, Cancelled
+  createdAt    DateTime      @default(now())
+}
+
+model ProductInquiry {
+  id            String        @id @default(uuid())
+  productId     String
+  product       MarketProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inquirerName  String
+  inquirerPhone String
+  message       String        @db.Text
+  status        String        @default("Pending") // Pending, Resolved
+  createdAt     DateTime      @default(now())
 }
