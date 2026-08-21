@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createPerformanceTarget, getPerformanceTargets } from "@/actions/performance";
+import { createPerformanceTarget, getPerformanceTargets } from "@/app/actions/performance";
 import { Loader2, PlusCircle, CheckCircle2, ShieldAlert, Target, FileText } from "lucide-react";
 
 const COMPONENTS = [
@@ -19,7 +19,15 @@ export default function PerformancePlanningPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [targets, setTargets] = useState<any[]>([]);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    componentName: string;
+    expectedOutcomes: string;
+    targetPercentage: number;
+    baselineValue: number;
+    meansOfVerification: string;
+    timeFrame: string;
+    responsiblePerson: string;
+  }>({
     componentName: COMPONENTS[0],
     expectedOutcomes: "",
     targetPercentage: 100,

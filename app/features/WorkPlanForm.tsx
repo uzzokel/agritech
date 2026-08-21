@@ -21,6 +21,7 @@ export default function WorkPlanForm({ onSuccess }: { onSuccess?: () => void }) 
     const payload = {
       componentName: formData.get("componentName") as string,
       budgetCategory: formData.get("budgetCategory") as string,
+      state: formData.get("state") as string, // <-- Added state here
       description: formData.get("description") as string,
       detailedCalculation: formData.get("detailedCalculation") as string,
       unitCost: Number(formData.get("unitCost")) || 0,
@@ -94,6 +95,18 @@ export default function WorkPlanForm({ onSuccess }: { onSuccess?: () => void }) 
             <option value="GOODS_EQUIPMENT">Goods & Equipment</option>
             <option value="TRAINING_TRAVELS">Training & Travels</option>
           </select>
+        </div>
+
+        {/* State / Location */}
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">State / Location</label>
+          <input
+            type="text"
+            name="state"
+            required
+            placeholder="e.g. FCT, Kaduna, Nasarawa"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-[#16a34a] text-sm"
+          />
         </div>
 
         {/* Unit Cost */}

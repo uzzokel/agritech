@@ -204,12 +204,12 @@ export function BlogFeed({
     setCommentText("");
 
     const res = await addComment(postId, author, text);
-    if (res.success && res.comment) {
+    if (res.success && res.data) {
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId
-            ? { ...p, comments: [res.comment as CommentType, ...(p.comments || [])] }
-            : p
+            ? { ...p, comments: [res.data as CommentType, ...(p.comments || [])] }
+        : p
         )
       );
     }

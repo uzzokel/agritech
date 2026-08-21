@@ -304,6 +304,7 @@ model AdvisoryQuery {
   question    String      @db.Text
   cropOrTopic String?     // e.g., "Cassava Rot", "Pesticide Application"
   location    String?     // e.g., "Kano", "Oyo"
+  expertReply String?  // Add this line
   status      QueryStatus @default(PENDING)
   
   // Responses

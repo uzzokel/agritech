@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getPerformanceMonitoringData, createOrUpdateActual } from "@/actions/performance";
+import { getPerformanceMonitoringData, createOrUpdateActual } from "@/app/actions/performance";
 import { Loader2, TrendingUp, ShieldAlert, CheckCircle2 } from "lucide-react";
 
 export default function PerformanceMonitoringPage() {
@@ -157,7 +157,7 @@ export default function PerformanceMonitoringPage() {
                       <td className="py-3 px-2">
                         {flag === "GREEN" && (
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            Green (≤20%)
+                            Green (&le;20%)
                           </span>
                         )}
                         {flag === "AMBER" && (
@@ -167,7 +167,7 @@ export default function PerformanceMonitoringPage() {
                         )}
                         {flag === "RED" && (
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">
-                            Red (≥50%)
+                            Red (&ge;50%)
                           </span>
                         )}
                       </td>

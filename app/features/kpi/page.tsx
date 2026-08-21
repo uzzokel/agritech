@@ -58,7 +58,7 @@ export default function KPITrackingPage() {
   // Targets State
   const [targets, setTargets] = useState<TargetItem[]>([]);
   const [targetForm, setTargetForm] = useState({
-    componentName: COMPONENTS[0],
+    componentName: COMPONENTS[0]as string,
     expectedOutcomes: "",
     targetPercentage: "",
     baselineValue: "",
