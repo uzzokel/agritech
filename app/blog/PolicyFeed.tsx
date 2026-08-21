@@ -10,7 +10,6 @@ import {
   exportPolicyDataToCsv, 
   createSuccessStory, 
   createRoutinePerformance,
-  deletePolicyRecord,
   getPolicyBrief,
   updatePolicyBrief
 } from "@/app/actions/policy-actions";
@@ -111,21 +110,14 @@ export function PolicyFeed({ isAdmin = true, initialBrief = null }: PolicyFeedPr
   // Policy Brief Control States
   const [showBriefForm, setShowBriefForm] = useState(false);
 
-  // Interactive Form Styling Controls State
-  const [selectedHighlight, setSelectedHighlight] = useState<string>(initialBrief?.highlightClass || "bg-yellow-100 text-yellow-900 px-1 rounded");
-  const [selectedFamily, setSelectedFamily] = useState<string>(initialBrief?.fontFamily || "sans");
-  const [selectedSize, setSelectedSize] = useState<string>(initialBrief?.fontSize || "text-base");
-  const [selectedColor, setSelectedColor] = useState<string>(initialBrief?.textColor || "text-slate-900");
-  const [selectedWeight, setSelectedWeight] = useState<string>(initialBrief?.fontWeight || "font-bold");
-
-  // Editable Live Policy Brief State
+  // Editable Live Policy Brief State with Cross-Sector & External Linkages Focus
   const defaultBriefState: PolicyBriefItem = {
     id: "brief-default-1",
-    title: initialBrief?.title || "Digitalizing Smallholder Supply Chains: Reducing Economic Loss Through Real-Time Market Integration",
-    domain: initialBrief?.domain || "Agriculture & Food Systems",
-    focus: initialBrief?.focus || "How digital platforms can solve information asymmetry for farmers, reducing post-harvest losses and improving price transparency.",
+    title: initialBrief?.title || "Digitalizing Smallholder Supply Chains: Cross-Sector Impacts & External Institutional Linkages",
+    domain: initialBrief?.domain || "Agriculture, Trade & Institutional Collaboration",
+    focus: initialBrief?.focus || "Analytical policy brief addressing cross-sector impacts, external institutional linkages, and market collaborations to bridge information asymmetry and mitigate post-harvest vulnerabilities.",
     recommendations: initialBrief?.recommendations || [
-      "Implement centralized mobile-first registry hubs across major agricultural clusters to log harvest volumes dynamically.",
+      "Establish cross-sector institutional frameworks connecting agricultural ministries, financial technology providers, and logistics bureaus.",
       "Deploy localized pricing SMS/USSD alerts linked directly with regional trading boards to minimize exploitation by middle agents.",
       "Integrate state-level logistics mapping to coordinate direct aggregation points, shortening transit times for perishable yields."
     ],
@@ -277,7 +269,7 @@ export function PolicyFeed({ isAdmin = true, initialBrief = null }: PolicyFeedPr
   const handleDownloadSingleBriefPdf = (brief: PolicyBriefItem) => {
     const doc = new jsPDF({ orientation: "portrait" });
     doc.setFontSize(14);
-    doc.text("POLICY BRIEF: AGRI-TECH & FOOD SYSTEMS", 14, 20);
+    doc.text("POLICY BRIEF: CROSS-SECTOR & MARKET LINKAGES", 14, 20);
     
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -289,14 +281,14 @@ export function PolicyFeed({ isAdmin = true, initialBrief = null }: PolicyFeedPr
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52);
 
     doc.setFont("helvetica", "bold");
-    doc.text("Core Focus:", 14, 65);
+    doc.text("Core Focus & Institutional Linkages:", 14, 65);
     doc.setFont("helvetica", "normal");
     doc.text(brief.focus, 14, 72, { maxWidth: 180 });
 
     doc.setFont("helvetica", "bold");
-    doc.text("Strategic Recommendations:", 14, 90);
+    doc.text("Strategic Recommendations:", 14, 95);
     
-    let yPos = 98;
+    let yPos = 103;
     brief.recommendations.forEach((rec) => {
       doc.setFont("helvetica", "normal");
       doc.text(`• ${rec}`, 18, yPos, { maxWidth: 175 });
@@ -673,14 +665,80 @@ export function PolicyFeed({ isAdmin = true, initialBrief = null }: PolicyFeedPr
 
                     setBriefsData([newBrief, ...briefsData]);
                     setShowBriefForm(false);
+                    setPage(1);
                   }}
                   className="mt-4 p-6 border rounded-xl bg-slate-50 shadow-inner space-y-4"
                 >
                   <h3 className="text-base font-semibold text-slate-800">
-                    Create New Policy Brief
+                    Create New Analytical Policy Brief (Cross-Sector & Linkages)
                   </h3>
 
-                  {/* Form fields for brief creation omitted for space brevity */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Policy Brief Title</label>
+                      <input 
+                        name="title" 
+                        placeholder="e.g. Cross-Sector Integration in Agricultural Supply Chains" 
+                        required 
+                        className="w-full p-2 border rounded bg-white text-slate-900 text-sm" 
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Domain / Sector</label>
+                        <input 
+                          name="domain" 
+                          placeholder="e.g. Agriculture, Trade & Institutional Collaboration" 
+                          required 
+                          className="w-full p-2 border rounded bg-white text-slate-900 text-sm" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Font Styling</label>
+                        <select name="fontFamily" className="w-full p-2 border rounded bg-white text-slate-900 text-sm">
+                          <option value="sans">Sans-Serif</option>
+                          <option value="serif">Serif</option>
+                          <option value="mono">Monospace</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Core Focus (Addressing cross-sector impacts, external institutional linkages, and market collaborations)
+                      </label>
+                      <textarea 
+                        name="focus" 
+                        rows={3}
+                        placeholder="Describe analytical framework, cross-sector coordination, and external linkages..." 
+                        required 
+                        className="w-full p-2 border rounded bg-white text-slate-900 text-sm" 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Strategic Recommendations (Enter each recommendation on a new line)
+                      </label>
+                      <textarea 
+                        name="recommendations" 
+                        rows={4}
+                        placeholder="Recommendation 1&#10;Recommendation 2&#10;Recommendation 3" 
+                        required 
+                        className="w-full p-2 border rounded bg-white text-slate-900 text-sm" 
+                      />
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button 
+                        type="submit" 
+                        className="px-5 py-2 bg-emerald-600 text-white font-medium text-sm rounded-lg hover:bg-emerald-700 transition"
+                      >
+                        Publish Policy Brief
+                      </button>
+                    </div>
+                  </div>
                 </form>
               )}
             </div>
@@ -688,38 +746,93 @@ export function PolicyFeed({ isAdmin = true, initialBrief = null }: PolicyFeedPr
 
           {/* Policy Briefs Display List */}
           <div className="grid grid-cols-1 gap-6">
-            {filteredBriefs.map((brief) => (
-              <div key={brief.id} className="p-6 bg-white border rounded-xl shadow-sm space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">{brief.domain}</span>
-                    <h3 className="text-xl font-bold text-slate-900 mt-1">{brief.title}</h3>
-                  </div>
-                  <button
-                    onClick={() => handleDownloadSingleBriefPdf(brief)}
-                    className="px-3 py-1.5 bg-rose-600 text-white text-xs font-semibold rounded hover:bg-rose-700 transition"
-                  >
-                    Download PDF
-                  </button>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase">Core Focus</h4>
-                  <p className="text-slate-700 text-sm mt-1">{brief.focus}</p>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Strategic Recommendations</h4>
-                  <ul className="space-y-1">
-                    {brief.recommendations.map((rec, i) => (
-                      <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
-                        <span className="text-emerald-600 font-bold">•</span>
-                        <span>{rec}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            {filteredBriefs.length === 0 ? (
+              <div className="p-8 text-center bg-white border rounded-xl text-slate-400">
+                No policy briefs found matching your search.
               </div>
-            ))}
+            ) : (
+              filteredBriefs
+                .slice((page - 1) * 5, page * 5)
+                .map((brief) => (
+                  <div key={brief.id} className="p-6 bg-white border rounded-xl shadow-sm space-y-4">
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">{brief.domain}</span>
+                        <h3 className="text-xl font-bold text-slate-900 mt-1">{brief.title}</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleDownloadSingleBriefPdf(brief)}
+                          className="px-3 py-1.5 bg-rose-600 text-white text-xs font-semibold rounded hover:bg-rose-700 transition"
+                        >
+                          Download PDF
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              if (confirm("Are you sure you want to delete this policy brief?")) {
+                                setBriefsData(briefsData.filter(b => b.id !== brief.id));
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-slate-200 text-slate-700 text-xs font-semibold rounded hover:bg-red-600 hover:text-white transition"
+                            title="Delete Brief"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-500 uppercase">Core Focus & Market Collaborations</h4>
+                      <p className="text-slate-700 text-sm mt-1">{brief.focus}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Strategic Recommendations</h4>
+                      <ul className="space-y-1">
+                        {brief.recommendations.map((rec, i) => (
+                          <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
+                            <span className="text-emerald-600 font-bold">•</span>
+                            <span>{rec}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))
+            )}
           </div>
+
+          {/* Policy Briefs Pagination Controls */}
+          {Math.ceil(filteredBriefs.length / 5) > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between border-t pt-4 gap-4 text-sm text-slate-600 bg-white px-2">
+              <div>
+                Showing <span className="font-semibold">{Math.min((page - 1) * 5 + 1, filteredBriefs.length)}</span> to{" "}
+                <span className="font-semibold">{Math.min(page * 5, filteredBriefs.length)}</span> of{" "}
+                <span className="font-semibold">{filteredBriefs.length}</span> policy briefs
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 border rounded-lg bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Previous
+                </button>
+                
+                <span className="px-3 py-1.5 font-medium text-slate-800">
+                  Page {page} of {Math.ceil(filteredBriefs.length / 5)}
+                </span>
+
+                <button
+                  onClick={() => setPage((prev) => Math.min(prev + 1, Math.ceil(filteredBriefs.length / 5)))}
+                  disabled={page === Math.ceil(filteredBriefs.length / 5)}
+                  className="px-3 py-1.5 border rounded-lg bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Data Tables for Success Stories & Routine Performance */
@@ -760,112 +873,49 @@ export function PolicyFeed({ isAdmin = true, initialBrief = null }: PolicyFeedPr
                   </tr>
                 ) : data.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-500">No records found matching your criteria.</td>
+                    <td colSpan={9} className="p-8 text-center text-slate-500">No records found. Click "+ Add" to create one.</td>
                   </tr>
-                ) : activeTab === "stories" ? (
-                  (data as SuccessStoryItem[]).map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition">
-                      <td className="p-3 font-medium">{item.fullName}</td>
-                      <td className="p-3">{item.state}</td>
-                      <td className="p-3">{item.clusterName || "N/A"}</td>
-                      <td className="p-3">{item.userGroup || "N/A"}</td>
-                      <td className="p-3">{item.location || "N/A"}</td>
-                      <td className="p-3 max-w-xs truncate">{item.narration}</td>
-                      <td className="p-3 text-right">
-                        {isAdmin && (
-                          <button
-                            onClick={async () => {
-                              if (confirm("Are you sure you want to delete this record?")) {
-                                await deletePolicyRecord("stories", item.id);
-                                startTransition(async () => {
-                                  const refreshed = await getSuccessStories({ page, search, state: stateFilter });
-                                  setData(refreshed.data);
-                                  setPagination(refreshed.pagination);
-                                });
-                              }
-                            }}
-                            className="text-red-600 hover:text-red-800 text-xs font-medium"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
                 ) : (
-                  (data as RoutinePerformanceItem[]).map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition">
-                      <td className="p-3 font-medium">{item.state}</td>
-                      <td className="p-3">{item.quarter} {item.year}</td>
-                      <td className="p-3 max-w-xs">{item.kpi}</td>
-                      <td className="p-3">{item.baseline}</td>
-                      <td className="p-3">{item.target}</td>
-                      <td className="p-3">{item.achievement}</td>
-                      <td className="p-3">{item.variance}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                          item.flag === "On Track" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                        }`}>
-                          {item.flag} ({item.pct}%)
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        {isAdmin && (
-                          <button
-                            onClick={async () => {
-                              if (confirm("Are you sure you want to delete this metric?")) {
-                                await deletePolicyRecord("routine", item.id);
-                                startTransition(async () => {
-                                  const refreshed = await getRoutinePerformance({ page, search, state: stateFilter });
-                                  setData(refreshed.data);
-                                  setPagination(refreshed.pagination);
-                                });
-                              }
-                            }}
-                            className="text-red-600 hover:text-red-800 text-xs font-medium"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </td>
+                  data.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50 transition">
+                      {activeTab === "stories" ? (
+                        <>
+                          <td className="p-3 font-medium">{(item as SuccessStoryItem).fullName}</td>
+                          <td className="p-3">{(item as SuccessStoryItem).state}</td>
+                          <td className="p-3">{(item as SuccessStoryItem).clusterName || "N/A"}</td>
+                          <td className="p-3">{(item as SuccessStoryItem).userGroup || "N/A"}</td>
+                          <td className="p-3">{(item as SuccessStoryItem).location || "N/A"}</td>
+                          <td className="p-3 max-w-xs truncate">{(item as SuccessStoryItem).narration}</td>
+                          <td className="p-3 text-right">
+                            <span className="text-xs text-slate-400">Recorded</span>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-3 font-medium">{(item as RoutinePerformanceItem).state}</td>
+                          <td className="p-3">{(item as RoutinePerformanceItem).quarter} {(item as RoutinePerformanceItem).year}</td>
+                          <td className="p-3 max-w-xs">{(item as RoutinePerformanceItem).kpi}</td>
+                          <td className="p-3">{(item as RoutinePerformanceItem).baseline}</td>
+                          <td className="p-3">{(item as RoutinePerformanceItem).target}</td>
+                          <td className="p-3">{(item as RoutinePerformanceItem).achievement}</td>
+                          <td className="p-3">{(item as RoutinePerformanceItem).variance}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                              (item as RoutinePerformanceItem).flag === "On Track" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {(item as RoutinePerformanceItem).flag} ({(item as RoutinePerformanceItem).pct}%)
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <span className="text-xs text-slate-400">Recorded</span>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
-          </div>
-
-          {/* ========================================= */}
-          {/* PAGINATION CONTROLS BAR                   */}
-          {/* ========================================= */}
-          <div className="flex flex-col sm:flex-row justify-between items-center bg-white px-4 py-3 border rounded-xl shadow-sm gap-4">
-            <div className="text-xs text-slate-600">
-              Showing <span className="font-semibold text-slate-900">{pagination.startItem || 0}</span> to{" "}
-              <span className="font-semibold text-slate-900">{pagination.endItem || 0}</span> of{" "}
-              <span className="font-semibold text-slate-900">{pagination.totalCount || 0}</span> entries
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                disabled={page <= 1 || isPending}
-                className="px-3 py-1.5 border rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                Previous
-              </button>
-
-              <span className="text-xs font-medium text-slate-700 px-2">
-                Page {pagination.currentPage || page} of {pagination.totalPages || 1}
-              </span>
-
-              <button
-                onClick={() => setPage((prev) => Math.min(prev + 1, pagination.totalPages || 1))}
-                disabled={page >= (pagination.totalPages || 1) || isPending}
-                className="px-3 py-1.5 border rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                Next
-              </button>
-            </div>
           </div>
         </div>
       )}
