@@ -843,11 +843,13 @@ export function PolicyFeed({ isAdmin = true, initialBrief = null }: PolicyFeedPr
                 <tr className="bg-slate-100 border-b text-slate-700 text-xs uppercase tracking-wider">
                   {activeTab === "stories" ? (
                     <>
+                      <th className="p-3">Photo</th>
                       <th className="p-3">Full Name</th>
                       <th className="p-3">State</th>
                       <th className="p-3">Cluster</th>
                       <th className="p-3">User Group</th>
                       <th className="p-3">Location</th>
+                      <th className="p-3">GPS</th>
                       <th className="p-3">Narration</th>
                       <th className="p-3 text-right">Actions</th>
                     </>
@@ -876,43 +878,85 @@ export function PolicyFeed({ isAdmin = true, initialBrief = null }: PolicyFeedPr
                     <td colSpan={9} className="p-8 text-center text-slate-500">No records found. Click "+ Add" to create one.</td>
                   </tr>
                 ) : (
-                  data.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition">
-                      {activeTab === "stories" ? (
-                        <>
-                          <td className="p-3 font-medium">{(item as SuccessStoryItem).fullName}</td>
-                          <td className="p-3">{(item as SuccessStoryItem).state}</td>
-                          <td className="p-3">{(item as SuccessStoryItem).clusterName || "N/A"}</td>
-                          <td className="p-3">{(item as SuccessStoryItem).userGroup || "N/A"}</td>
-                          <td className="p-3">{(item as SuccessStoryItem).location || "N/A"}</td>
-                          <td className="p-3 max-w-xs truncate">{(item as SuccessStoryItem).narration}</td>
-                          <td className="p-3 text-right">
-                            <span className="text-xs text-slate-400">Recorded</span>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="p-3 font-medium">{(item as RoutinePerformanceItem).state}</td>
-                          <td className="p-3">{(item as RoutinePerformanceItem).quarter} {(item as RoutinePerformanceItem).year}</td>
-                          <td className="p-3 max-w-xs">{(item as RoutinePerformanceItem).kpi}</td>
-                          <td className="p-3">{(item as RoutinePerformanceItem).baseline}</td>
-                          <td className="p-3">{(item as RoutinePerformanceItem).target}</td>
-                          <td className="p-3">{(item as RoutinePerformanceItem).achievement}</td>
-                          <td className="p-3">{(item as RoutinePerformanceItem).variance}</td>
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                              (item as RoutinePerformanceItem).flag === "On Track" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                            }`}>
-                              {(item as RoutinePerformanceItem).flag} ({(item as RoutinePerformanceItem).pct}%)
-                            </span>
-                          </td>
-                          <td className="p-3 text-right">
-                            <span className="text-xs text-slate-400">Recorded</span>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))
+                  data.map((item, idx) => {
+                    const s = item as SuccessStoryItem;
+                    const r = item as RoutinePerformanceItem;
+                    const imgSource = s.imageUrl || s.photoUrl;
+                    
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50 transition">
+                        {activeTab === "stories" ? (
+                          <>
+                            {/* Photo Thumbnail */}
+                            <td className="p-3">
+                              {imgSource ? (
+                                <a href={imgSource} target="_blank" rel="noopener noreferrer">
+                                  <img 
+                                    src={imgSource} 
+                                    alt={s.fullName || "Story image"} 
+                                    className="w-10 h-10 object-cover rounded-md border shadow-sm hover:opacity-85 transition" 
+                                  />
+                                </a>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">None</span>
+                              )}
+                            </td>
+
+                            <td className="p-3 font-medium text-slate-900">{s.fullName}</td>
+                            <td className="p-3 text-slate-600">{s.state}</td>
+                            <td className="p-3 text-slate-600">{s.clusterName || "N/A"}</td>
+                            <td className="p-3 text-slate-600">{s.userGroup || "N/A"}</td>
+                            <td className="p-3 text-slate-600">{s.location || "N/A"}</td>
+
+                            {/* GPS Badge with Map Link */}
+                            <td className="p-3">
+                              {s.gps ? (
+                                <a 
+                                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.gps)}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-800 px-2 py-1 rounded-md font-mono hover:bg-emerald-100 transition"
+                                  title="Open in Google Maps"
+                                >
+                                  📍 {s.gps}
+                                </a>
+                              ) : (
+                                <span className="text-xs text-slate-400">N/A</span>
+                              )}
+                            </td>
+
+                            <td className="p-3 max-w-xs truncate text-slate-600" title={s.narration}>
+                              {s.narration}
+                            </td>
+
+                            <td className="p-3 text-right">
+                              <span className="text-xs text-slate-400">Recorded</span>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="p-3 font-medium">{r.state}</td>
+                            <td className="p-3">{r.quarter} {r.year}</td>
+                            <td className="p-3 max-w-xs">{r.kpi}</td>
+                            <td className="p-3">{r.baseline}</td>
+                            <td className="p-3">{r.target}</td>
+                            <td className="p-3">{r.achievement}</td>
+                            <td className="p-3">{r.variance}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                r.flag === "On Track" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                              }`}>
+                                {r.flag} ({r.pct}%)
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="text-xs text-slate-400">Recorded</span>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
